@@ -1,8 +1,12 @@
 #fAlgo = function(job, data, instance, base_seed, nf, margin, i) {
 fAlgo = function(job, data, instance, base_seed, l2sens, epsilon, delta, reps) {
 
-  cs = 2 * log(1.25 / delta)
-  noise = (sqrt(cs) * l2sens / epsilon)^2
+  if ((delta == 0) || (epsilon == 0)) {
+    noise = 0
+  } else {
+    cs = 2 * log(1.25 / delta)
+    noise = (sqrt(cs) * l2sens / epsilon)^2
+  }
 
   ll = list()
   for (i in seq_len(reps)) {
@@ -43,9 +47,8 @@ fAlgo = function(job, data, instance, base_seed, l2sens, epsilon, delta, reps) {
 
       # Calculate CI using the variance based on the noisy score values:
       var_auc_app = deLongVar(scores = df_roc_glm$score, truth = df_roc_glm$truth)
-      ci_app_log = pepeCI(lauc_emp, alpha, var_auc)
+      ci_app_log = pepeCI(lauc_emp, alpha, var_auc_app)
       ci_app_auc = 1 / (1 + exp(-ci_app_log))
-
 
       # Calculate the error of the approximated CI:
       delta_ci = sum(abs(ci_app_auc - ci_emp_auc)) / (2 * sum(diff(ci_emp_auc)))
@@ -93,9 +96,19 @@ fAlgo = function(job, data, instance, base_seed, l2sens, epsilon, delta, reps) {
 
 addProblem("dummy")
 addAlgorithm(name = "auc-values", fun = fAlgo)
-addExperiments(algo.design = list('auc-values' = expand.grid(
-  base_seed  = BASE_SEED,
-  l2sens     = L2SENS,
-  epsilon    = EPSILON,
-  delta      = DELTA,
-  reps       = REPETITIONS)))
+addExperiments(algo.design = list('auc-values' = rbind(
+  data.frame(
+    base_seed = BASE_SEED,
+    l2sens    = 0,
+    epsilon   = 0,
+    delta     = 0,
+    reps      = REPETITIONS
+  ),
+  expand.grid(
+    base_seed  = BASE_SEED,
+    l2sens     = L2SENS,
+    epsilon    = EPSILON,
+    delta      = DELTA,
+    reps       = REPETITIONS
+  )
+)))

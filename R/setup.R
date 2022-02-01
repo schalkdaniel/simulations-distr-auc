@@ -8,5 +8,5 @@ DELTA        = seq(0.1, 0.5, 0.1)
 if (TEST) {
   REPETITIONS = 10L
 } else {
-  REPETITIONS  = 1000L
+  REPETITIONS  = 10000L
 }
