@@ -1,5 +1,7 @@
-FILES        = paste0("R/", c("helper.R", "probit-regression.R"))
+FILES        = "R/helper.R"
 BASE_SEED    = 31415L
+
+# Set different tried out values:
 L2SENS       = c(0.01, 0.05, 0.1)
 EPSILON      = seq(0.1, 0.5, 0.1)
 DELTA        = seq(0.1, 0.5, 0.1)

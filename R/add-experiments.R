@@ -1,4 +1,3 @@
-#fAlgo = function(job, data, instance, base_seed, nf, margin, i) {
 fAlgo = function(job, data, instance, base_seed, l2sens, epsilon, delta, reps) {
 
   if ((delta == 0) || (epsilon == 0)) {
@@ -97,6 +96,9 @@ fAlgo = function(job, data, instance, base_seed, l2sens, epsilon, delta, reps) {
 addProblem("dummy")
 addAlgorithm(name = "auc-values", fun = fAlgo)
 addExperiments(algo.design = list('auc-values' = rbind(
+
+  # This is the base configuration without any noise. We use
+  # this to get an idea of the accuracy of the ROC-GLM.
   data.frame(
     base_seed = BASE_SEED,
     l2sens    = 0,
@@ -104,6 +106,7 @@ addExperiments(algo.design = list('auc-values' = rbind(
     delta     = 0,
     reps      = REPETITIONS
   ),
+  # This is the grid of all tried out values:
   expand.grid(
     base_seed  = BASE_SEED,
     l2sens     = L2SENS,

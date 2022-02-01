@@ -1,8 +1,35 @@
 ---
+title: Calculation of the ROC-GLM and AUC confidence interval for distributed non-disclosive analysis in DataSHIELD
+subtitle: Simulation code and results
 output: github_document
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+
+## About the repository
+
+This repository contains all code that is needed to run/reproduce the simulation
+study for the respective paper. It also contains the code used to create the figures and tables.
+
+### Structure
+
+- File to run the simulations: `simulation.R`
+- `R` code:
+    - Helper function for calculating the Probit regression, AUC values, and confidence intervals: `R/helper.R`
+    - Code to add the experiments using `batchtools` (called by `simulation.R`): `R/add-experiments.R`
+    - Installation script to get all required package with the version used for the benchmark: `R/install-pkgs-versions.R`
+    - Setup variables like repetitions or the grid of values for the simulation for the benchmark: `R/setup.R`
+- Batchtools registry and results: `batchtools` (see [below](#simulation-results) how to load the results)
+- Folder for the paper figues `*.pdf` and README figures `*.png`: `figures`
+- Folder containing `*.tex` files of tables: `tables`
+
+## Reproduce the results from the paper
+
+To fully reproduce the results run the `simulation.R` script. To reproduce the figures of the paper, render the README with `rmarkdown::render("README.Rmd")`. When rendering the README, all figures are created and stored in `figures` while the table is stored in `tables`.
+
+## Analyse results
+
+The following code was used to load and analyse the results. It can be used to fully reproduce the figures and tables of the paper.
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(
@@ -12,17 +39,12 @@ knitr::opts_chunk$set(
   warning  = FALSE,
   message  = FALSE
 )
+```
 
-use_font = TRUE
 
-evince = function(file) system(paste0("evince ", file, " &"))
+### Setup
 
-## ============================================================== ##
-##
-##                              SETUP
-##
-## ============================================================== ##
-
+```{r}
 # source(here::here("R/install-pkgs-versions.R"))
 
 library(dplyr)
@@ -34,53 +56,54 @@ library(ggridges)
 library(knitr)
 library(batchtools)
 
-### Figure setup:
-if (use_font) {
-  font = "TeX Gyre Bonum"
 
-  sysfonts::font_add(font,
-      regular = "/usr/share/texmf-dist/fonts/opentype/public/tex-gyre/texgyrebonum-regular.otf",
-      bold = "/usr/share/texmf-dist/fonts/opentype/public/tex-gyre/texgyrebonum-bold.otf")
-  extrafont::font_import(paths = "~/repos/bm-CompAspCboost/paper-figures/gyre-bonum", prompt = FALSE)
-  extrafont::loadfonts()
+### Theme setup:
+## ==================================================================
 
-  theme = theme_minimal(base_family = font)
+# Set font (if available):
+font = "Tinos"
+sysfonts::font_add_google(font, font)
+extrafont::loadfonts()
+ft = extrafont::fonttable()
+
+if (all(! grepl(font, x = ft$FamilyName))) {
+  my_theme = theme_minimal()
 } else {
-  theme = theme_minimal()
+  my_theme = theme_minimal(base_family = font)
 }
 
 theme_set(
-  theme +
-  ggplot2::theme(
+  my_theme +
+  theme(
+    plot.title = element_text(size = 10),
+    plot.subtitle = element_text(size = 9),
     strip.background = element_rect(fill = "white", color = "black"),
     strip.text = element_text(color = "black", face = "bold", size = 7),
     axis.text = element_text(size = 7),
     axis.title = element_text(size = 9),
-    legend.title = element_text(size = 7),
-    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+
     panel.border = element_rect(colour = "black", fill = NA, size = 0.5)
   )
 )
-
-my_color = scale_color_uchicago()
-my_fill = scale_fill_uchicago()
-
-g_legend = function(a_gplot) {
-  tmp = ggplot_gtable(ggplot_build(a_gplot))
-  leg = which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
-  legend = tmp$grobs[[leg]]
-  return(legend)
-}
 
 # to determine width, use the latex package `layouts` and put
 # `\printinunitsof{mm}\prntlen{\textwidth}` into the tex file.
 textwidth = 148.92
 
 ## Helper functions:
-logitToAUC = function(x) 1 / (1 + exp(-x))
+## =====================================================================
+
+source(here::here("R/helper.R"))
+
+#' Open pdf files using evince on linux machines
+#' @param file to the pdf
+evince = function(file) system(paste0("evince ", file, " &"))
 ```
 
-## Simulation Results
+
+### Simulation Results
 
 ```{r}
 ## Load data
@@ -88,14 +111,16 @@ loadRegistry(here::here("batchtools/"))
 
 ### Load ROC-GLM approximation::
 results = reduceResultsList()
-dtmp = do.call(rbind, lapply(results, function(ll) do.call(rbind, lapply(ll, function(l) l$aucs))))
 
+# Split results:
+# - 1. element of list contains the ordinary ROC-GLM.
+# - All other elements contain the distributed ROC-GLM with differential privacy.
 aucs_emp = do.call(rbind, lapply(results[[1]], function(ll) ll$aucs))
 aucs_dp  = do.call(rbind, lapply(results[-1], function(ll) {
   do.call(rbind, lapply(ll, function(l) l$aucs))
 }))
 
-### Load Distributed ROC-GLM approximations:
+### Distributed ROC-GLM approximations:
 app_acc = rbind(
   data.frame(lower = 0, upper = (0.8 - 0.6) * 1 / 100, qual = "$\\Delta AUC < 0.002$"),
   data.frame(lower = (0.8 - 0.6) * 1 / 100, upper = (1 - 0.5) * 1 / 100, qual = "$\\Delta AUC < 0.005$"),
@@ -105,77 +130,15 @@ aucs_dp = aucs_dp %>%
   mutate(
     auc_diff = abs(auc_emp - auc_roc),
     qual = cut(auc_diff, breaks = c(app_acc$lower, Inf), labels = app_acc$qual))
-
-
-
-
-#if (file.exists(here::here("data/aucs-distr-noise.Rda"))) {
-#  load(here::here("data/aucs-distr-noise.Rda"))
-#} else{
-#  load(here::here("data/ll_aucs_nfacs.Rda"))
-#  aucs_distr = do.call(rbind, lapply(ll_aucs_nfacs, function(lla) {
-#    do.call(rbind, apply(lla, 1, function(ll) {
-#      cbind(ll[[1]]$aucs, noisef = ll$nfac, margin = ll$margin)
-#    }))
-#  }))
-#  aucs_distr = aucs_distr %>%
-#    mutate(
-#      auc_diff = abs(auc_emp - auc_roc),
-#      qual = cut(auc_diff, breaks = c(app_acc$lower, Inf), labels = app_acc$qual),
-#      margin_rel = margin / n)
-#
-#  save(aucs_distr, file = here::here("data/aucs-distr-noise.Rda"))
-#}
-#
-#
-#### Load confidence Intervals (CIs):
-#cis = do.call(rbind, lapply(ll_aucs, function(ll) {
-#  cbind(ll$cis, ll$aucs[rep(1, 4), ])
-#}))
-#
-#cis = cis %>%
-#  group_by(n, npos, threshold) %>%
-#  mutate(
-#    auc_lower_diff = logitToAUC(lower) - logitToAUC(lower[method == "DeLong Empirical"]),
-#    auc_upper_diff = logitToAUC(upper) - logitToAUC(upper[method == "DeLong Empirical"])
-#  )
 ```
 
-## Figures
+### Figures
 
-### AUC density
+#### AUC densities
 
 ```{r}
-#gg_den_both = ggplot(data = aucs_emp) +
-#  geom_histogram(aes(x = auc_emp, color = "Empirical AUC", fill = "Empirical AUC", y = ..density..),
-#     color = "white", size = 0.2, alpha = 0.4) +
-#  geom_histogram(aes(x = auc_roc, color = "AUC (ROC-GLM)", fill = "AUC (ROC-GLM)", y = ..density..),
-#     color = "white", size = 0.2, alpha = 0.2) +
-#  geom_histogram(aes(x = auc_emp, color = "Empirical AUC", fill = "Empirical AUC", y = ..density..),
-#     color = "white", size = 0.2, alpha = 0) +
-#  geom_density(aes(x = auc_emp, color = "Empirical AUC", fill = "Empirical AUC"),
-#     fill = "transparent", size = 0.6, alpha = 0.4) +
-#  geom_density(aes(x = auc_roc, color = "AUC (ROC-GLM)", fill = "AUC (ROC-GLM)"),
-#     fill = "transparent", size = 0.6, alpha = 0.2) +
-#  theme(legend.position = "bottom", legend.key.size = unit(0.2, 'cm')) +
-#  xlab("AUC") +
-#  ylab("Density") +
-#  labs(fill = "", color = "") +
-#  my_fill + my_color
-#
-#gg_den_both
-#
-#ggsave(plot = gg_den_both,
-#  filename = here::here("figures/auc-emp-density.pdf"),
-#  width = textwidth * 0.4,
-#  height = textwidth * 1/4,
-#  units = "mm")
-
-
-
 ## Comparison for different n intervals:
 #nb      = c(100, 200, 400, 800, 1600, 2500)
-
 nb      = seq(100, 2500, length.out = 7)
 clabels = paste0("n in (", nb[-length(nb)], ", ", nb[-1], "]")
 ncut    = cut(aucs_emp$n, breaks = nb, labels = clabels)
@@ -198,11 +161,12 @@ gg_den_both_facet = ggplot(data = aucs_emp_plt) +
      fill = "transparent", size = 0.6, alpha = 0.4) +
   geom_density(aes(x = auc_roc, color = "AUC (ROC-GLM)", fill = "AUC (ROC-GLM)"),
      fill = "transparent", size = 0.6, alpha = 0.2) +
-  theme(legend.position = "bottom", legend.key.size = unit(0.2, 'cm')) +
+  theme(legend.position = "bottom", legend.key.size = unit(0.2, "cm")) +
   xlab("AUC") +
   ylab("Density") +
   labs(fill = "", color = "") +
-  my_fill + my_color +
+  scale_color_uchicago() +
+  scale_fill_uchicago() +
   facet_wrap(~ n_cat)
 
 gg_den_both_facet
@@ -210,61 +174,28 @@ gg_den_both_facet
 ggsave(plot = gg_den_both_facet,
   filename = here::here("figures/auc-emp-density-facets.pdf"),
   width = textwidth,
-  height = textwidth * 2/4,
+  height = textwidth * 0.5,
   units = "mm")
-```
 
-### Compare CIs
-
-```{r}
-#cis$ci_range = cis$upper - cis$lower
-#nb = c(0, 200, 400, 800, 1600, 3200)
-#
-#cis_plt = cis %>%
-#  pivot_longer(cols = c("lower", "upper"), names_to = "ci") %>%
-#  mutate(
-#    auc_cat = cut(auc_emp, breaks = seq(0.5, 1, length.out = 11L)),
-#    n_cat = cut(n, breaks = nb, labels = paste0("n in (", nb[-length(nb)], ", ", nb[-1], "]")),
-#    value = logitToAUC(value)) %>%
-#  select(-noise) %>%
-#  na.omit()
-#
-##gg_short = cis_plt %>% filter(((n > 200) & (n < 400)) | ((n > 1600 & n < 3200))) %>% filter(auc_cat %in% c("(0.5,0.55]", "(0.7,0.75]")) %>%
-#gg_cis = cis_plt %>%
-#  ggplot(aes(x = value, fill = ci, y = method, color = ci)) +
-#  geom_density_ridges(alpha = 0.5, rel_min_height = 0.01, show.legend = FALSE) + #, color = "transparent") +
-#  #theme_ridges(grid = TRUE, center_axis_labels = TRUE) +
-#  scale_x_continuous(breaks = seq(0.5, 1, 0.1)) +
-#  xlab("AUC") +
-#  ylab("") +
-#  labs(fill = "CI Boundary") +
-#  facet_grid(paste0("AUC in\n", auc_cat) ~ n_cat) +
-#  ggtitle("Comparison of 95 % AUC CIs", subtitle = paste0("Lower CI (red) and upper CI (gray) of ", nrow(aucs_emp), " repetitions")) +
-#  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-#  my_color + my_fill
-#
-#gg_cis
-#
-#ggsave(plot = gg_cis,
-#  filename = here::here("figures/auc-cis.pdf"),
-#  width    = textwidth * 1.2,
-#  height   = textwidth * 1.3,
-#  units    = "mm")
+#evince(here::here("figures/auc-emp-density-facets.pdf"))
 ```
 
 ### Approximation errors
 
 ```{r}
-l2senss = sort(unique(aucs_dp$l2sens))
-ggs = list()
-for (i in seq_along(l2senss)) {
+## AUC VALUES
+## =======================================================
 
+l2senss  = sort(unique(aucs_dp$l2sens))
+auc_cuts = seq(0.5, 1, length.out = 21L)
+ggs_auc  = list()
+for (i in seq_along(l2senss)) {
   df_dp = aucs_dp %>% filter(l2sens == l2senss[i])
 
   tab = df_dp %>%
     mutate(
-      auc_app_cut = cut(x = auc_roc, breaks = seq(0.5, 1, length.out = 21L)),
-      auc_emp_cut = cut(x = auc_emp, breaks = seq(0.5, 1, length.out = 21L))
+      auc_app_cut = cut(x = auc_roc, breaks = auc_cuts),
+      auc_emp_cut = cut(x = auc_emp, breaks = auc_cuts)
     ) %>%
     group_by(auc_emp_cut, epsilon, delta) %>%
     summarize(
@@ -280,40 +211,46 @@ for (i in seq_along(l2senss)) {
 
   tab$qual = factor(tab$qual, levels = rev(app_acc$qual))
 
-  ggs[[i]] = ggplot(na.omit(tab), aes(x = "1", y = auc_emp_cut, color = qual, fill = qual)) +
+  ggs_auc[[i]] = ggplot(na.omit(tab), aes(x = "1", y = auc_emp_cut, color = qual, fill = qual)) +
     geom_tile() +
-    scale_y_discrete(limits = rev, breaks = levels(tab$auc_emp_cut)[c(5, 16)]) +
+    scale_y_discrete(limits = rev, breaks = levels(tab$auc_emp_cut)[c(5, 11, 17)],
+      labels = auc_cuts[c(5, 11, 17)]) +
     xlab("") +
     theme(axis.text.x = element_blank()) +
+    ylab("") +
     ylab("AUC bin") +
     scale_color_npg(labels = unname(latex2exp::TeX(rev(app_acc$qual)))) +
-    scale_fill_npg(labels = unname(latex2exp::TeX(rev(app_acc$qual)))) + # Looks nicer than uchicago
-    #my_color + my_fill +
+    scale_fill_npg(labels = unname(latex2exp::TeX(rev(app_acc$qual)))) +
     labs(color = "Accuracy", fill = "Accuracy") +
-    facet_grid(paste0("Delta:\n", delta) ~ paste0("Eps.:\n", epsilon)) +
+    facet_grid(delta ~ epsilon, labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
     theme(
-      strip.background = element_rect(fill = "white", color = "black"),
-      strip.text = element_text(color = "black", face = "bold", size = 7),
-      axis.text = element_text(size = 7 * 1.6),
-      axis.title = element_text(size = 9 * 1.6),
-      legend.title = element_text(size = 7 * 1.6),
-      legend.text = element_text(size = 6 * 1.6),
+      axis.ticks.y = element_line(colour = "black", size = 0.2),
+      strip.text = element_text(color = "black", face = "bold", size = 5),
       panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
       legend.position = "bottom",
-      panel.margin = unit(0, "lines")
+      panel.spacing = unit(0, "lines")
     ) +
-    ggtitle(latex2exp::TeX(paste0("$\\Delta_2(\\hat{f}) = ", l2senss[i], "$")))
+    ggtitle(latex2exp::TeX(paste0("$\\Delta_2(f) = ", l2senss[i], "$")))
 }
 
-gg = ggpubr::ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ncol = 3, nrow = 1, common.legend = TRUE, legend = "bottom")
+gg_auc_dp = ggpubr::ggarrange(ggs_auc[[1]], ggs_auc[[2]], ggs_auc[[3]], ncol = 3, nrow = 1,
+  common.legend = TRUE, legend = "bottom")
 
+gg_auc_dp
 
+ggsave(plot = gg_auc_dp,
+  filename = here::here("figures/auc-diff-priv.pdf"),
+  width = textwidth * 1,
+  height = textwidth * 0.5,
+  units = "mm")
 
+#evince(here::here("figures/auc-diff-priv.pdf"))
+```
 
+```{r}
+## CI BOUNDARIES
+## =======================================================
 
-
-
-#### CIs:
 ggs_ci = list()
 for (i in seq_along(l2senss)) {
 
@@ -322,8 +259,8 @@ for (i in seq_along(l2senss)) {
 
   tab = df_dp %>%
     mutate(
-      auc_app_cut = cut(x = auc_roc, breaks = seq(0.5, 1, length.out = 21L)),
-      auc_emp_cut = cut(x = auc_emp, breaks = seq(0.5, 1, length.out = 21L))
+      auc_app_cut = cut(x = auc_roc, breaks = auc_cuts),
+      auc_emp_cut = cut(x = auc_emp, breaks = auc_cuts)
     ) %>%
     group_by(auc_emp_cut, epsilon, delta) %>%
     summarize(
@@ -342,105 +279,62 @@ for (i in seq_along(l2senss)) {
 
   ggs_ci[[i]] = ggplot(na.omit(tab), aes(x = "1", y = auc_emp_cut, color = qual_ci, fill = qual_ci)) +
     geom_tile() +
-    scale_y_discrete(limits = rev, breaks = levels(tab$auc_emp_cut)[c(5, 16)]) +
+    scale_y_discrete(limits = rev, breaks = levels(tab$auc_emp_cut)[c(5, 11, 17)],
+      labels = auc_cuts[c(5, 11, 17)]) +
     xlab("") +
     theme(axis.text.x = element_blank()) +
     ylab("AUC bin") +
     scale_color_npg(labels = unname(latex2exp::TeX(levels(tab$qual_ci)))) +
-    scale_fill_npg(labels = unname(latex2exp::TeX(levels(tab$qual_ci)))) + # Looks nicer than uchicago
-    #my_color + my_fill +
+    scale_fill_npg(labels = unname(latex2exp::TeX(levels(tab$qual_ci)))) +
     labs(fill = "Accuracy") +
     guides(color = "none") +
-    facet_grid(paste0("Delta:\n", delta) ~ paste0("Eps.:\n", epsilon)) +
+    facet_grid(delta ~ epsilon, labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
     theme(
-      strip.background = element_rect(fill = "white", color = "black"),
-      strip.text = element_text(color = "black", face = "bold", size = 7),
-      axis.text = element_text(size = 7 * 1.6),
-      axis.title = element_text(size = 9 * 1.6),
-      legend.title = element_text(size = 7 * 1.6),
-      legend.text = element_text(size = 6 * 1.6),
+      axis.ticks.y = element_line(colour = "black", size = 0.2),
+      strip.text = element_text(color = "black", face = "bold", size = 5),
       panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
       legend.position = "bottom",
-      panel.margin = unit(0, "lines")
+      panel.spacing = unit(0, "lines")
     ) +
-    ggtitle(latex2exp::TeX(paste0("$\\Delta_2(\\hat{f}) = ", l2senss[i], "$")))
+    ggtitle(latex2exp::TeX(paste0("$\\Delta_2(f) = ", l2senss[i], "$")))
 }
 
-gg_ci = ggpubr::ggarrange(ggs_ci[[1]], ggs_ci[[2]], ggs_ci[[3]], ncol = 3, nrow = 1, common.legend = TRUE, legend = "bottom")
+gg_ci_dp = ggpubr::ggarrange(ggs_ci[[1]], ggs_ci[[2]], ggs_ci[[3]], ncol = 3, nrow = 1,
+  common.legend = TRUE, legend = "bottom")
 
-ggsave(plot = gg_ci,
+gg_ci
+
+ggsave(plot = gg_ci_dp,
   filename = here::here("figures/cis-diff-priv.pdf"),
-  width = textwidth * 1.6,
-  height = textwidth * 0.6,
+  width = textwidth,
+  height = textwidth * 0.5,
   units = "mm")
 
-evince(here::here("figures/cis-diff-priv.pdf"))
+#evince(here::here("figures/cis-diff-priv.pdf"))
 ```
 
-## Tables
+### Table of AUC values
 
 ```{r}
+# Discretize empirical AUC values into 20 bins between 0.5 and 1.
 tab = aucs_emp %>% mutate(
     auc_diff = auc_emp - auc_roc,
     auc_app_cut = cut(x = auc_roc, breaks = seq(0.5, 1, length.out = 21L)),
     auc_emp_cut = cut(x = auc_emp, breaks = seq(0.5, 1, length.out = 21L))
   ) %>%
   group_by(auc_emp_cut) %>%
-  summarize(Min. = min(auc_diff, na.rm = TRUE), "1st Qu." = quantile(auc_diff, 0.25, na.rm = TRUE),
-    Median = median(auc_diff, na.rm = TRUE), Mean = mean(auc_diff, na.rm = TRUE), "3rd Qu." = quantile(auc_diff, 0.75, na.rm = TRUE),
-    Max. = max(auc_diff, na.rm = TRUE), Sd. = sd(auc_diff, na.rm = TRUE), Count = n())
+  # Calculate summary statistics per bin:
+  summarize(
+    "Min."    = min(auc_diff, na.rm = TRUE),
+    "1st Qu." = quantile(auc_diff, 0.25, na.rm = TRUE),
+    "Median"  = median(auc_diff, na.rm = TRUE),
+    "Mean"    = mean(auc_diff, na.rm = TRUE),
+    "3rd Qu." = quantile(auc_diff, 0.75, na.rm = TRUE),
+    "Max."    = max(auc_diff, na.rm = TRUE), Sd. = sd(auc_diff, na.rm = TRUE), Count = n()) %>%
+  na.omit()
 
 tab_latex = tab %>% kable(format = "latex")
 writeLines(tab_latex, here::here("tables/auc-approximations.tex"))
 
 tab %>% kable()
-```
-
-
-## CIs
-
-```{r}
-ll_cis = list()
-for (k in seq_along(l2sens)) {
-  pb = txtProgressBar(min = 1, max = length(ll_aucs_nfacs), style = 3)
-  ll = list()
-
-  for (i in seq_along(ll_aucs_nfacs)) {
-    sidx = sample(seq_len(nrow(ll_aucs_nfacs[[i]])), 2500)
-    setTxtProgressBar(pb, i)
-    l = 1
-
-    for (j in seq_along(sidx)) {
-      tmp = ll_aucs_nfacs[[i]][[sidx[j]]]
-
-      cis = tmp$cis
-      cis = cis[cis$method %in% c("DeLong Empirical", "DeLong ROC-GLM"), ]
-      cis$lower = logitToAUC(cis$lower)
-      cis$upper = logitToAUC(cis$upper)
-      cis$auc = logitToAUC(cis$log_auc)
-
-      cs = sqrt(tmp$aucs$noise) / l2sens[k] * epss
-      delta_ci = (abs(diff(cis$lower)) + abs(diff(cis$upper))) /
-        abs(cis[cis$method == "DeLong Empirical", "upper"] - cis[cis$method == "DeLong Empirical", "lower"])
-
-      df_tmp = data.frame(noise = tmp$aucs$noise, n = tmp$aucs$n, epsilon = epss,
-        delta = 1.25 / exp(cs / 2), delta_ci = delta_ci, l2sens = l2sens[k])
-
-      ll[[l]] = list(cis = cis, appr_errs = df_tmp)
-      l = l + 1
-    }
-  }
-
-  ll_cis[[k]] = ll
-  close(pb)
-}
-
-ll_dp_cis = lapply(ll_cis, function(ll) do.call(rbind, lapply(ll, function(l) l$appr_errs)))
-
-dtmp = ll_dp_cis[[1]]
-summary(na.omit(dtmp$delta_ci))
-plot(density(dtmp$noise))
-table(dtmp$noise < 0.1)
-
-ggplot(dtmp, aes(x = epsilon, y = delta, color = delta_ci)) + geom_point()
 ```
