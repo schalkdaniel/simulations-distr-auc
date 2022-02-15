@@ -333,8 +333,104 @@ tab = aucs_emp %>% mutate(
     "Max."    = max(auc_diff, na.rm = TRUE), Sd. = sd(auc_diff, na.rm = TRUE), Count = n()) %>%
   na.omit()
 
-tab_latex = tab %>% kable(format = "latex")
+tab$auc_emp_cut = paste0("$", tab$auc_emp_cut, "$")
+tab$Count = paste0("$", tab$Count, "$")
+tnames = names(tab)
+for (tn in tnames[-c(1, length(tnames))]) {
+  tab[[tn]] = ifelse((abs(tab[[tn]]) > 0.005) & (tn %in% c("Median", "Mean")),
+    paste0("$\\mathbf{", sprintf("%.4f", round(tab[[tn]], 4)), "}$"),
+    paste0("$", sprintf("%.4f", round(tab[[tn]], 4)), "$"))
+}
+
+tab_latex = tab %>% kable(format = "latex", escape = FALSE)
 writeLines(tab_latex, here::here("tables/auc-approximations.tex"))
 
 tab %>% kable()
+```
+
+### Visualization of Gaussian mechanism
+
+```{r}
+set.seed(31415)
+x = runif(10, 0, 1)
+
+l2s = c(0.01, 0.05, 0.1)
+epsilons = seq(0.1, 0.5, length.out = 3L)
+deltas = seq(0.1, 0.5, length.out = 3L)
+
+getSD = function(l2s, epsilon, delta) sqrt(2 * log(1.25 / delta)) * l2s / epsilon
+
+pars = expand.grid(x = x, l2s = l2s, epsilon = epsilons, delta = deltas)
+pars$sd = getSD(pars$l2s, pars$epsilon, pars$delta)
+pars$xnew = rnorm(n = nrow(pars), pars$x, sd = pars$sd)
+pars$xnew = ifelse(pars$xnew > 1, 1, pars$xnew)
+pars$xnew = ifelse(pars$xnew < 0, 0, pars$xnew)
+pars$id = rep(seq_along(x), times = nrow(pars) / length(x))
+
+ll = list()
+for (i in seq_len(nrow(pars))) {
+  sdd = pars$sd[i]
+  xx = seq(pars$x[i] - 4 * sdd, pars$x[i] + 4 * sdd, length.out = 100L)
+  yx = dnorm(x = xx, mean = pars$x[i], sd = sdd)
+  ll[[i]] = data.frame(x = pars$x[i], xx = xx, yx = yx, l2s = pars$l2s[i],
+    epsilon = pars$epsilon[i], delta = pars$delta[i], group = as.character(i),
+    xnew = pars$xnew[i], id = pars$id[i], sdd = sdd)
+}
+df_plt = do.call(rbind, ll)
+
+library(ggplot2)
+library(dplyr)
+library(ggsci)
+
+df_text = df_plt %>%
+  group_by(l2s, delta) %>%
+  mutate(ymax = max(yx)) %>%
+  group_by(l2s, epsilon) %>%
+  mutate(xleft = min(xx)) %>%
+  group_by(group, id, l2s) %>%
+  filter(row_number() == 1) %>%
+  mutate(y = 0.1 * ymax) %>%
+  group_by(l2s, epsilon, delta) %>%
+  mutate(order_original = order(order(x)), order_new = order(order(xnew)))
+  #mutate(y = (ymax - yx) * 0.05)
+
+order(df_text[1:10, ]$x)
+
+df_tau = df_text %>%
+  group_by(l2s, epsilon, delta) %>%
+  filter(row_number() == 1) %>%
+  mutate(sd_label = latex2exp::TeX(paste0("$\\tau = ",  round(sdd, 3), "$"), output = "character"))
+
+for (l2s0 in l2s) {
+  gg_dp = ggplot() +
+    geom_line(data = df_plt %>% filter(l2s == l2s0),
+      mapping = aes(x = xx, y = yx, group = group, color = as.factor(id)), alpha = 0.6, show.legend = FALSE) +
+    geom_segment(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, xend = xnew, yend = -2 * y)) +
+    geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, label = order_original, fill = as.factor(id)),
+      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+    geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = xnew, y = -2 * y, label = order_new, fill = as.factor(id)),
+      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+    geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = 0, label = "f(x)"),
+      family = font, size = 2, hjust = 0, fill = "white", label.size = 0) +
+    geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = -2 * y, label = "f(x) + r"),
+      family = font, size = 2, hjust = -0, fill = "white", label.size = 0) +
+    geom_label(data = df_tau %>% filter(l2s == l2s0), aes(x = xleft, y = y * 9, label = sd_label),
+      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0, family = font) +
+    facet_grid(delta ~ epsilon, scales = "free", labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
+    scale_color_npg() +
+    scale_fill_npg() +
+    xlab(latex2exp::TeX("Score values $f(x)$")) +
+    ylab(latex2exp::TeX("Density of $f(x) + r$ with $r \\sim N(0, \\tau^2)$ distribution")) +
+    ggtitle(latex2exp::TeX(paste0("Gaussian Mechanism for $\\Delta_2(f) = ", l2s0, "$")))
+
+  gg_dp
+
+  ggsave(plot = gg_dp,
+    filename = here::here(paste0("figures/gaussian-mechanism", l2s0, ".pdf")),
+    width = textwidth,
+    height = textwidth,
+    units = "mm")
+}
+
+# evince(here::here("figures/gaussian-mechanism0.01.pdf"))
 ```
