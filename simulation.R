@@ -34,7 +34,7 @@ BATCHTOOLS_DIR = "batchtools/"
 library(batchtools)
 
 # Remove the batchtools directory to rerun the simulations.
-if (FALSE) unlink("batchtools", recursive = TRUE)
+if (dir.exists(BATCHTOOLS_DIR) && RERUN) unlink("batchtools", recursive = TRUE)
 
 # If the batchtools directory exists, the simulations are
 # continued:
