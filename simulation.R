@@ -1,3 +1,7 @@
+# If you want to rerun the whole simulation set this variable
+# to `TRUE`
+RERUN = TRUE
+
 # If you just want to have a SHORT test simulation with just
 # 10 repetitions, then set `TEST = TRUE`. The full simulation
 # is done with 10000 repetitions when setting `TEST = FALSE`.
@@ -34,7 +38,7 @@ if (FALSE) unlink("batchtools", recursive = TRUE)
 
 # If the batchtools directory exists, the simulations are
 # continued:
-if (dir.exists(BATCHTOOLS_DIR)) {
+if (dir.exists(BATCHTOOLS_DIR) && (! RERUN)) {
 
   loadRegistry(BATCHTOOLS_DIR, writeable = TRUE, work.dir = here::here())
   submitJobs(findNotDone())
