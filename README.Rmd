@@ -20,7 +20,7 @@ study for the respective paper. It also contains the code used to create the fig
     - Installation script to get all required package with the version used for the benchmark: `R/install-pkgs-versions.R`
     - Setup variables like repetitions or the grid of values for the simulation for the benchmark: `R/setup.R`
 - Batchtools registry and results: `batchtools` (see [below](#simulation-results) how to load the results)
-- Folder for the paper figues `*.pdf` and README figures `*.png`: `figures`
+- Folder for the paper figures `*.pdf` and README figures `*.png`: `figures`
 - Folder containing `*.tex` files of tables: `tables`
 
 ## Reproduce the results from the paper
