@@ -52,7 +52,7 @@ figures are created and stored in `figures` while the table is stored in
 
 ## Inspect results using the Docker
 
-Running the docker provides an RStudio API in your browser with all
+Running the [docker](https://hub.docker.com/r/schalkdaniel/simulations-distr-auc) provides an RStudio API in your browser with all
 packages pre-installed and data to inspect the results. Therefore do:
 
 1.  Get the docker:
