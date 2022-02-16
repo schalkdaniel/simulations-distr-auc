@@ -4,6 +4,18 @@ non-disclosive analysis in DataSHIELD
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
+  - [About the repository](#about-the-repository)
+  - [Reproduce the results from the
+    paper](#reproduce-the-results-from-the-paper)
+  - [Analyse results](#analyse-results)
+      - [Setup](#setup)
+      - [Simulation Results](#simulation-results)
+      - [Figures](#figures)
+      - [Table of AUC values](#table-of-auc-values)
+      - [Visualization of Gaussian
+        mechanism](#visualization-of-gaussian-mechanism)
+  - [Session Info](#session-info)
+
 ## About the repository
 
 This repository contains all code that is needed to run/reproduce the
@@ -24,14 +36,13 @@ used to create the figures and tables.
         simulation for the benchmark: `R/setup.R`
   - Batchtools registry and results: `batchtools` (see
     [below](#simulation-results) how to load the results)
-  - Folder for the paper figues `*.pdf` and README figures `*.png`:
+  - Folder for the paper figures `*.pdf` and README figures `*.png`:
     `figures`
   - Folder containing `*.tex` files of tables: `tables`
 
 ## Reproduce the results from the paper
 
-To fully reproduce the results run the `simulation.R` script 
-(this should not take longer than 1 hour, depending on your machine). To
+To fully reproduce the results run the `simulation.R` script. To
 reproduce the figures of the paper, render the README with
 `rmarkdown::render("README.Rmd")`. When rendering the README, all
 figures are created and stored in `figures` while the table is stored in
@@ -110,7 +121,7 @@ loadRegistry(here::here("batchtools/"))
 #> Experiment Registry
 #>   Backend   : Interactive
 #>   File dir  : /home/daniel/repos/simulations-distr-auc/batchtools
-#>   Work dir  : /home/daniel/repos/simulations-distr-auc
+#>   Work dir  : ./
 #>   Jobs      : 76
 #>   Problems  : 1
 #>   Algorithms: 1
@@ -320,7 +331,7 @@ for (i in seq_along(l2senss)) {
 gg_ci_dp = ggpubr::ggarrange(ggs_ci[[1]], ggs_ci[[2]], ggs_ci[[3]], ncol = 3, nrow = 1,
   common.legend = TRUE, legend = "bottom")
 
-gg_ci
+gg_ci_dp
 ```
 
 ![](figures/unnamed-chunk-6-1.png)<!-- -->
@@ -356,10 +367,21 @@ tab = aucs_emp %>% mutate(
     "Max."    = max(auc_diff, na.rm = TRUE), Sd. = sd(auc_diff, na.rm = TRUE), Count = n()) %>%
   na.omit()
 
-tab_latex = tab %>% kable(format = "latex")
+tab0 = tab
+
+tab$auc_emp_cut = paste0("$", tab$auc_emp_cut, "$")
+tab$Count = paste0("$", tab$Count, "$")
+tnames = names(tab)
+for (tn in tnames[-c(1, length(tnames))]) {
+  tab[[tn]] = ifelse((abs(tab[[tn]]) > 0.005) & (tn %in% c("Median", "Mean")),
+    paste0("$\\mathbf{", sprintf("%.4f", round(tab[[tn]], 4)), "}$"),
+    paste0("$", sprintf("%.4f", round(tab[[tn]], 4)), "$"))
+}
+
+tab_latex = tab %>% kable(format = "latex", escape = FALSE)
 writeLines(tab_latex, here::here("tables/auc-approximations.tex"))
 
-tab %>% kable()
+tab0 %>% kable()
 ```
 
 | auc\_emp\_cut |     Min. |  1st Qu. |   Median |     Mean |  3rd Qu. |   Max. |    Sd. | Count |
@@ -384,3 +406,131 @@ tab %>% kable()
 | (0.925,0.95\] | \-0.0193 | \-0.0105 | \-0.0091 | \-0.0089 | \-0.0076 | 0.0056 | 0.0030 |   481 |
 | (0.95,0.975\] | \-0.0227 | \-0.0138 | \-0.0113 | \-0.0113 | \-0.0093 | 0.0067 | 0.0037 |   503 |
 | (0.975,1\]    | \-0.0180 | \-0.0093 | \-0.0062 | \-0.0064 | \-0.0034 | 0.0013 | 0.0039 |   529 |
+
+### Visualization of Gaussian mechanism
+
+``` r
+set.seed(31415)
+x = runif(10, 0, 1)
+
+l2s = c(0.01, 0.05, 0.1)
+epsilons = seq(0.1, 0.5, length.out = 3L)
+deltas = seq(0.1, 0.5, length.out = 3L)
+
+getSD = function(l2s, epsilon, delta) sqrt(2 * log(1.25 / delta)) * l2s / epsilon
+
+pars = expand.grid(x = x, l2s = l2s, epsilon = epsilons, delta = deltas)
+pars$sd = getSD(pars$l2s, pars$epsilon, pars$delta)
+pars$xnew = rnorm(n = nrow(pars), pars$x, sd = pars$sd)
+pars$xnew = ifelse(pars$xnew > 1, 1, pars$xnew)
+pars$xnew = ifelse(pars$xnew < 0, 0, pars$xnew)
+pars$id = rep(seq_along(x), times = nrow(pars) / length(x))
+
+ll = list()
+for (i in seq_len(nrow(pars))) {
+  sdd = pars$sd[i]
+  xx = seq(pars$x[i] - 4 * sdd, pars$x[i] + 4 * sdd, length.out = 100L)
+  yx = dnorm(x = xx, mean = pars$x[i], sd = sdd)
+  ll[[i]] = data.frame(x = pars$x[i], xx = xx, yx = yx, l2s = pars$l2s[i],
+    epsilon = pars$epsilon[i], delta = pars$delta[i], group = as.character(i),
+    xnew = pars$xnew[i], id = pars$id[i], sdd = sdd)
+}
+df_plt = do.call(rbind, ll)
+
+library(ggplot2)
+library(dplyr)
+library(ggsci)
+
+df_text = df_plt %>%
+  group_by(l2s, delta) %>%
+  mutate(ymax = max(yx)) %>%
+  group_by(l2s, epsilon) %>%
+  mutate(xleft = min(xx)) %>%
+  group_by(group, id, l2s) %>%
+  filter(row_number() == 1) %>%
+  mutate(y = 0.1 * ymax) %>%
+  group_by(l2s, epsilon, delta) %>%
+  mutate(order_original = order(order(x)), order_new = order(order(xnew)))
+  #mutate(y = (ymax - yx) * 0.05)
+
+order(df_text[1:10, ]$x)
+#>  [1]  5  3  7  2  6  8  4 10  9  1
+
+df_tau = df_text %>%
+  group_by(l2s, epsilon, delta) %>%
+  filter(row_number() == 1) %>%
+  mutate(sd_label = latex2exp::TeX(paste0("$\\tau = ",  round(sdd, 3), "$"), output = "character"))
+
+ggs_gm = list()
+for (l2s0 in l2s) {
+  gg_dp = ggplot() +
+    geom_line(data = df_plt %>% filter(l2s == l2s0),
+      mapping = aes(x = xx, y = yx, group = group, color = as.factor(id)), alpha = 0.6, show.legend = FALSE) +
+    geom_segment(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, xend = xnew, yend = -2 * y)) +
+    geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, label = order_original, fill = as.factor(id)),
+      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+    geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = xnew, y = -2 * y, label = order_new, fill = as.factor(id)),
+      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+    geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = 0, label = "f(x)"),
+      family = font, size = 2, hjust = 0, fill = "white", label.size = 0) +
+    geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = -2 * y, label = "f(x) + r"),
+      family = font, size = 2, hjust = -0, fill = "white", label.size = 0) +
+    geom_label(data = df_tau %>% filter(l2s == l2s0), aes(x = xleft, y = y * 9, label = sd_label),
+      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0, family = font) +
+    facet_grid(delta ~ epsilon, scales = "free", labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
+    scale_color_npg() +
+    scale_fill_npg() +
+    xlab(latex2exp::TeX("Score values $f(x)$")) +
+    ylab(latex2exp::TeX("Density of $f(x) + r$ with $r \\sim N(0, \\tau^2)$ distribution")) +
+    ggtitle(latex2exp::TeX(paste0("Gaussian Mechanism for $\\Delta_2(f) = ", l2s0, "$")))
+
+  ggs_gm[[paste0("l2s", l2s0)]] = gg_dp
+
+  ggsave(plot = gg_dp,
+    filename = here::here(paste0("figures/gaussian-mechanism", l2s0, ".pdf")),
+    width = textwidth,
+    height = textwidth,
+    units = "mm")
+}
+ggs_gm[[1]]
+```
+
+![](figures/unnamed-chunk-8-1.png)<!-- -->
+
+``` r
+
+# evince(here::here("figures/gaussian-mechanism0.01.pdf"))
+```
+
+## Session Info
+
+``` r
+sessionInfo()
+#> R version 4.1.2 (2021-11-01)
+#> Platform: x86_64-pc-linux-gnu (64-bit)
+#> Running under: Arch Linux
+#> 
+#> Matrix products: default
+#> BLAS:   /usr/lib/libblas.so.3.10.0
+#> LAPACK: /usr/lib/liblapack.so.3.10.0
+#> 
+#> locale:
+#>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C               LC_TIME=en_GB.UTF-8        LC_COLLATE=en_US.UTF-8     LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_US.UTF-8    LC_PAPER=en_GB.UTF-8      
+#>  [8] LC_NAME=C                  LC_ADDRESS=C               LC_TELEPHONE=C             LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
+#> 
+#> attached base packages:
+#> [1] stats     graphics  grDevices utils     datasets  methods   base     
+#> 
+#> other attached packages:
+#>  [1] pROC_1.18.0       checkmate_2.0.0   batchtools_0.9.15 knitr_1.36        ggridges_0.5.3    ggsci_2.9         gridExtra_2.3     ggplot2_3.3.5     tidyr_1.2.0       dplyr_1.0.8      
+#> 
+#> loaded via a namespace (and not attached):
+#>  [1] jsonlite_1.7.3    carData_3.0-4     here_0.1          assertthat_0.2.1  highr_0.8         prettycode_1.1.0  base64url_1.4     cellranger_1.1.0  yaml_2.2.1        progress_1.2.2   
+#> [11] Rttf2pt1_1.3.8    pillar_1.7.0      backports_1.4.1   glue_1.6.1        extrafontdb_1.0   digest_0.6.29     ggsignif_0.6.0    colorspace_2.0-2  cowplot_1.0.0     htmltools_0.4.0  
+#> [21] plyr_1.8.6        pkgconfig_2.0.3   broom_0.7.1       haven_2.4.3       sysfonts_0.8.1    purrr_0.3.4       scales_1.1.1      brew_1.0-6        openxlsx_4.2.2    rio_0.5.16       
+#> [31] tibble_3.1.6      generics_0.1.2    farver_2.1.0      car_3.0-10        ellipsis_0.3.2    ggpubr_0.3.0      withr_2.4.3       cli_3.2.0         readxl_1.3.1      magrittr_2.0.2   
+#> [41] crayon_1.5.0      evaluate_0.14     fs_1.5.0          fansi_1.0.2       forcats_0.5.1     rstatix_0.5.0     foreign_0.8-81    textshaping_0.3.6 tools_4.1.2       data.table_1.14.2
+#> [51] prettyunits_1.1.1 hms_1.1.1         lifecycle_1.0.1   stringr_1.4.0     munsell_0.5.0     zip_2.1.1         compiler_4.1.2    systemfonts_1.0.3 rlang_1.0.1       grid_4.1.2       
+#> [61] rappdirs_0.3.3    labeling_0.4.2    rmarkdown_2.11    gtable_0.3.0      abind_1.4-5       DBI_1.1.0         curl_4.3.2        R6_2.5.1          extrafont_0.17    utf8_1.2.2       
+#> [71] rprojroot_2.0.2   latex2exp_0.5.0   ragg_1.2.0        stringi_1.7.6     Rcpp_1.0.8        vctrs_0.3.8       tidyselect_1.1.1  xfun_0.27
+```

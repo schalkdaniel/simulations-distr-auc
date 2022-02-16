@@ -7,7 +7,7 @@ output: github_document
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 - [About the repository](#about-the-repository)
-- [Reproduce the results from the paper](#about-the-repository)
+- [Reproduce the results from the paper](#reproduce-the-results-from-the-paper)
 - [Analyse results](#analyse-results)
     - [Setup](#setup)
     - [Simulation Results](#simulation-results)
@@ -313,7 +313,7 @@ for (i in seq_along(l2senss)) {
 gg_ci_dp = ggpubr::ggarrange(ggs_ci[[1]], ggs_ci[[2]], ggs_ci[[3]], ncol = 3, nrow = 1,
   common.legend = TRUE, legend = "bottom")
 
-gg_ci
+gg_ci_dp
 
 ggsave(plot = gg_ci_dp,
   filename = here::here("figures/cis-diff-priv.pdf"),
@@ -344,6 +344,8 @@ tab = aucs_emp %>% mutate(
     "Max."    = max(auc_diff, na.rm = TRUE), Sd. = sd(auc_diff, na.rm = TRUE), Count = n()) %>%
   na.omit()
 
+tab0 = tab
+
 tab$auc_emp_cut = paste0("$", tab$auc_emp_cut, "$")
 tab$Count = paste0("$", tab$Count, "$")
 tnames = names(tab)
@@ -356,7 +358,7 @@ for (tn in tnames[-c(1, length(tnames))]) {
 tab_latex = tab %>% kable(format = "latex", escape = FALSE)
 writeLines(tab_latex, here::here("tables/auc-approximations.tex"))
 
-tab %>% kable()
+tab0 %>% kable()
 ```
 
 ### Visualization of Gaussian mechanism
@@ -412,6 +414,7 @@ df_tau = df_text %>%
   filter(row_number() == 1) %>%
   mutate(sd_label = latex2exp::TeX(paste0("$\\tau = ",  round(sdd, 3), "$"), output = "character"))
 
+ggs_gm = list()
 for (l2s0 in l2s) {
   gg_dp = ggplot() +
     geom_line(data = df_plt %>% filter(l2s == l2s0),
@@ -434,7 +437,7 @@ for (l2s0 in l2s) {
     ylab(latex2exp::TeX("Density of $f(x) + r$ with $r \\sim N(0, \\tau^2)$ distribution")) +
     ggtitle(latex2exp::TeX(paste0("Gaussian Mechanism for $\\Delta_2(f) = ", l2s0, "$")))
 
-  gg_dp
+  ggs_gm[[paste0("l2s", l2s0)]] = gg_dp
 
   ggsave(plot = gg_dp,
     filename = here::here(paste0("figures/gaussian-mechanism", l2s0, ".pdf")),
@@ -442,6 +445,7 @@ for (l2s0 in l2s) {
     height = textwidth,
     units = "mm")
 }
+ggs_gm[[1]]
 
 # evince(here::here("figures/gaussian-mechanism0.01.pdf"))
 ```
