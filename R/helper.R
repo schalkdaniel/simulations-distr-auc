@@ -98,7 +98,7 @@ logitAUC = function(data, ind = NULL, unlogit = FALSE) {
   if (is.null(ind[1])) ind = seq_len(nrow(data))
   scores = data$score[ind]
   truth = data$truth[ind]
-  emp_auc = pROC::auc(truth, scores)
+  emp_auc = as.numeric(pROC::auc(truth, scores))
   #emp_auc = mlr::measureAUC(probabilities = scores, truth = truth, negative = 0, positive = 1)
   if (unlogit) return(emp_auc)
   return(toLogit(emp_auc))
@@ -122,7 +122,7 @@ toLogit = function(x) log(x / (1 - x))
 #' @param truth (`integer()`) True labels coded a 0 and 1.
 #' @return (`numeric(1)`) Variance of the AUC based on DeLong.
 deLongVar = function(scores, truth) {
-  checkmate::assertNumeric(x = score, any.missing = FALSE, len = length(truth))
+  checkmate::assertNumeric(x = scores, any.missing = FALSE, len = length(truth))
   checkmate::assertIntegerish(x = truth, lower = 0, upper = 1, any.missing = FALSE)
 
   # survivor functions for diseased and non diseased:
