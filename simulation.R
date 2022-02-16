@@ -3,6 +3,9 @@
 # is done with 10000 repetitions when setting `TEST = FALSE`.
 TEST = FALSE
 
+# Install packages with respective version.
+source(here::here("R/install-pkgs-versions.R"))
+
 # But, even the full benchmark with 10000 repetitions is not
 # too computational expensive and takes about 20 - 40 minutes
 # on a Linux notebook with an
@@ -20,7 +23,6 @@ setwd(here::here())
 # code also works on other machines. Therefore, it is
 # important to set the working directory to the root of
 # the repository.
-
 BATCHTOOLS_DIR = "batchtools/"
 
 ## Batchtools
