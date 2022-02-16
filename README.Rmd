@@ -434,3 +434,9 @@ for (l2s0 in l2s) {
 
 # evince(here::here("figures/gaussian-mechanism0.01.pdf"))
 ```
+
+## Session Info
+
+```{r}
+sessionInfo()
+```
