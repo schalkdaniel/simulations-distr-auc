@@ -198,6 +198,9 @@ probitRegr = function(y, X, w = NULL, beta_start = 0, stop_tol = 1e-8, iter_max 
   checkmate::assertIntegerish(x = y, lower = 0, upper = 1, any.missing = FALSE, len = nrow(X))
   checkmate::assertMatrix(x = X, mode = "numeric")
   checkmate::assertNumeric(x = w, len = length(y), null.ok = TRUE)
+  
+  if (length(beta_start) == 0) beta_start = rep(beta_start, ncol(X))
+  
   checkmate::assertNumeric(x = beta_start, len = ncol(X))
   checkmate::assertNumeric(x = stop_tol, len = 1L, lower = 0)
   checkmate::assertCount(x = iter_max)
