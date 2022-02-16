@@ -16,8 +16,8 @@
 #' @return (`data.frame()`) Data frame containing columns `score` and `truth`. The
 #'   score represents the predicted scores (e.g. from a statistical or prediction model).
 generateROCData = function(i, seed) {
-  checkmate::assertCount(i, len = 1L)
-  checkmate::assertCount(seed, len = 1L)
+  checkmate::assertCount(i)
+  checkmate::assertCount(seed)
 
   # Used seed:
   seed_k = seed + i
