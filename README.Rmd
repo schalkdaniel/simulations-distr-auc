@@ -4,6 +4,16 @@ subtitle: Simulation code and results
 output: github_document
 ---
 
+- [About the repository](#about-the-repository)
+- [Reproduce the results from the paper](#about-the-repository)
+- [Analyse results](#analyse-results)
+    - [Setup](#setup)
+    - [Simulation Results](#simulation-results)
+    - [Figures](#figures)
+    - [Table of AUC values](#table-of-auc-values)
+    - [Visualization of Gaussian mechanism](#visualization-of-gaussian-mechanism)
+- [Session Info](#session-info)
+
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 ## About the repository
