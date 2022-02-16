@@ -98,7 +98,7 @@ logitAUC = function(data, ind = NULL, unlogit = FALSE) {
   if (is.null(ind[1])) ind = seq_len(nrow(data))
   scores = data$score[ind]
   truth = data$truth[ind]
-  emp_auc = pROC::auc(truth, probabilities)
+  emp_auc = pROC::auc(truth, scores)
   #emp_auc = mlr::measureAUC(probabilities = scores, truth = truth, negative = 0, positive = 1)
   if (unlogit) return(emp_auc)
   return(toLogit(emp_auc))
