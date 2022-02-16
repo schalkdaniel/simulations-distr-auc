@@ -30,7 +30,8 @@ used to create the figures and tables.
 
 ## Reproduce the results from the paper
 
-To fully reproduce the results run the `simulation.R` script. To
+To fully reproduce the results run the `simulation.R` script 
+(this should not take longer than 1 hour, depending on your machine). To
 reproduce the figures of the paper, render the README with
 `rmarkdown::render("README.Rmd")`. When rendering the README, all
 figures are created and stored in `figures` while the table is stored in
