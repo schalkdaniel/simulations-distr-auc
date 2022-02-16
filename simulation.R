@@ -13,7 +13,6 @@ source(here::here("R/install-pkgs-versions.R"))
 #        Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
 #
 # processor and using 7 of the available 8 cores.
-
 source(here::here("R/setup.R"))
 
 # MAKE SURE THAT THE WD IS SET TO THE ROOT OF THE REPO!
