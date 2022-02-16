@@ -7,6 +7,8 @@ non-disclosive analysis in DataSHIELD
   - [About the repository](#about-the-repository)
   - [Reproduce the results from the
     paper](#reproduce-the-results-from-the-paper)
+  - [Inspect results using the
+    Docker](#inspect-results-using-the-docker)
   - [Analyse results](#analyse-results)
       - [Setup](#setup)
       - [Simulation Results](#simulation-results)
@@ -47,6 +49,29 @@ reproduce the figures of the paper, render the README with
 `rmarkdown::render("README.Rmd")`. When rendering the README, all
 figures are created and stored in `figures` while the table is stored in
 `tables`.
+
+## Inspect results using the Docker
+
+Running the docker provides an RStudio API in your browser with all
+packages pre-installed and data to inspect the results. Therefore do:
+
+1.  Get the docker:
+
+<!-- end list -->
+
+  - **Build the docker manually:** Run `sudo docker build -t
+    schalkdaniel/simulations-distr-auc .` (You can use whatever tag you
+    like, but for consistency we use
+    `schalkdaniel/simulations-distr-auc`)
+  - **Pull the docker:** Run `sudo docker pull
+    schalkdaniel/simulations-distr-auc`
+
+<!-- end list -->
+
+2.  Run the docker: `sudo docker run -d -p 8787:8787 -e PASSWORD=test
+    schalkdaniel/simulations-distr-auc`
+3.  Open your browser and visit <localhost:8787>
+4.  Login with `rstudio` as user and `test` as password
 
 ## Analyse results
 
@@ -515,22 +540,40 @@ sessionInfo()
 #> LAPACK: /usr/lib/liblapack.so.3.10.0
 #> 
 #> locale:
-#>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C               LC_TIME=en_GB.UTF-8        LC_COLLATE=en_US.UTF-8     LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_US.UTF-8    LC_PAPER=en_GB.UTF-8      
-#>  [8] LC_NAME=C                  LC_ADDRESS=C               LC_TELEPHONE=C             LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
+#>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+#>  [3] LC_TIME=en_GB.UTF-8        LC_COLLATE=en_US.UTF-8    
+#>  [5] LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_US.UTF-8   
+#>  [7] LC_PAPER=en_GB.UTF-8       LC_NAME=C                 
+#>  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+#> [11] LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
 #> 
 #> attached base packages:
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
 #> other attached packages:
-#>  [1] pROC_1.18.0       checkmate_2.0.0   batchtools_0.9.15 knitr_1.36        ggridges_0.5.3    ggsci_2.9         gridExtra_2.3     ggplot2_3.3.5     tidyr_1.2.0       dplyr_1.0.8      
+#>  [1] pROC_1.18.0       checkmate_2.0.0   batchtools_0.9.15 knitr_1.36       
+#>  [5] ggridges_0.5.3    ggsci_2.9         gridExtra_2.3     ggplot2_3.3.5    
+#>  [9] tidyr_1.2.0       dplyr_1.0.8      
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] jsonlite_1.7.3    carData_3.0-4     here_0.1          assertthat_0.2.1  highr_0.8         prettycode_1.1.0  base64url_1.4     cellranger_1.1.0  yaml_2.2.1        progress_1.2.2   
-#> [11] Rttf2pt1_1.3.8    pillar_1.7.0      backports_1.4.1   glue_1.6.1        extrafontdb_1.0   digest_0.6.29     ggsignif_0.6.0    colorspace_2.0-2  cowplot_1.0.0     htmltools_0.4.0  
-#> [21] plyr_1.8.6        pkgconfig_2.0.3   broom_0.7.1       haven_2.4.3       sysfonts_0.8.1    purrr_0.3.4       scales_1.1.1      brew_1.0-6        openxlsx_4.2.2    rio_0.5.16       
-#> [31] tibble_3.1.6      generics_0.1.2    farver_2.1.0      car_3.0-10        ellipsis_0.3.2    ggpubr_0.3.0      withr_2.4.3       cli_3.2.0         readxl_1.3.1      magrittr_2.0.2   
-#> [41] crayon_1.5.0      evaluate_0.14     fs_1.5.0          fansi_1.0.2       forcats_0.5.1     rstatix_0.5.0     foreign_0.8-81    textshaping_0.3.6 tools_4.1.2       data.table_1.14.2
-#> [51] prettyunits_1.1.1 hms_1.1.1         lifecycle_1.0.1   stringr_1.4.0     munsell_0.5.0     zip_2.1.1         compiler_4.1.2    systemfonts_1.0.3 rlang_1.0.1       grid_4.1.2       
-#> [61] rappdirs_0.3.3    labeling_0.4.2    rmarkdown_2.11    gtable_0.3.0      abind_1.4-5       DBI_1.1.0         curl_4.3.2        R6_2.5.1          extrafont_0.17    utf8_1.2.2       
-#> [71] rprojroot_2.0.2   latex2exp_0.5.0   ragg_1.2.0        stringi_1.7.6     Rcpp_1.0.8        vctrs_0.3.8       tidyselect_1.1.1  xfun_0.27
+#>  [1] jsonlite_1.7.3    carData_3.0-4     here_0.1          assertthat_0.2.1 
+#>  [5] highr_0.8         prettycode_1.1.0  base64url_1.4     cellranger_1.1.0 
+#>  [9] yaml_2.2.1        progress_1.2.2    Rttf2pt1_1.3.8    pillar_1.7.0     
+#> [13] backports_1.4.1   glue_1.6.1        extrafontdb_1.0   digest_0.6.29    
+#> [17] ggsignif_0.6.0    colorspace_2.0-2  cowplot_1.0.0     htmltools_0.4.0  
+#> [21] plyr_1.8.6        pkgconfig_2.0.3   broom_0.7.1       haven_2.4.3      
+#> [25] sysfonts_0.8.1    purrr_0.3.4       scales_1.1.1      brew_1.0-6       
+#> [29] openxlsx_4.2.2    rio_0.5.16        tibble_3.1.6      generics_0.1.2   
+#> [33] farver_2.1.0      car_3.0-10        ellipsis_0.3.2    ggpubr_0.3.0     
+#> [37] withr_2.4.3       cli_3.2.0         readxl_1.3.1      magrittr_2.0.2   
+#> [41] crayon_1.5.0      evaluate_0.14     fs_1.5.0          fansi_1.0.2      
+#> [45] forcats_0.5.1     rstatix_0.5.0     foreign_0.8-81    textshaping_0.3.6
+#> [49] tools_4.1.2       data.table_1.14.2 prettyunits_1.1.1 hms_1.1.1        
+#> [53] lifecycle_1.0.1   stringr_1.4.0     munsell_0.5.0     zip_2.1.1        
+#> [57] compiler_4.1.2    systemfonts_1.0.3 rlang_1.0.1       grid_4.1.2       
+#> [61] rappdirs_0.3.3    labeling_0.4.2    rmarkdown_2.11    gtable_0.3.0     
+#> [65] abind_1.4-5       DBI_1.1.0         curl_4.3.2        R6_2.5.1         
+#> [69] extrafont_0.17    utf8_1.2.2        rprojroot_2.0.2   latex2exp_0.5.0  
+#> [73] ragg_1.2.0        stringi_1.7.6     Rcpp_1.0.8        vctrs_0.3.8      
+#> [77] tidyselect_1.1.1  xfun_0.27
 ```
