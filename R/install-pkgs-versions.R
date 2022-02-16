@@ -1,6 +1,6 @@
 install.packages('remotes')
 remotes::install_version("here", version = "0.1", upgrade = FALSE)
-remotes::install_version("dplyr", version = "1.0.8", upgrade = FALSE)
+remotes::install_version("dplyr", version = "1.0.7", upgrade = FALSE)
 remotes::install_version("tidyr", version = "1.2.0", upgrade = FALSE)
 remotes::install_version("ggplot2", version = "3.3.5", upgrade = FALSE)
 remotes::install_version("gridExtra", version = "2.3", upgrade = FALSE)
