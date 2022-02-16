@@ -1,4 +1,4 @@
-FROM rocker/rstudio:4.1.1
+FROM rocker/rstudio:4.1.2
 
 RUN git clone https://github.com/schalkdaniel/simulations-distr-auc /home/rstudio/simulations-distr-auc
 RUN Rscript /home/rstudio/simulations-distr-auc/R/install-pkgs-versions.R
