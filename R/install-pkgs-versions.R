@@ -1,4 +1,6 @@
 install.packages('remotes')
+
+remotes::install_version("checkmate", version = "2.0.0", upgrade = FALSE)
 remotes::install_version("here", version = "0.1", upgrade = FALSE)
 remotes::install_version("dplyr", version = "1.0.7", upgrade = FALSE)
 remotes::install_version("tidyr", version = "1.1.4", upgrade = FALSE)
