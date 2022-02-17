@@ -553,7 +553,7 @@ sessionInfo()
 #> other attached packages:
 #>  [1] pROC_1.18.0       checkmate_2.0.0   batchtools_0.9.15 knitr_1.36       
 #>  [5] ggridges_0.5.3    ggsci_2.9         gridExtra_2.3     ggplot2_3.3.5    
-#>  [9] tidyr_1.2.0       dplyr_1.0.8      
+#>  [9] tidyr_1.1.4       dplyr_1.0.7      
 #> 
 #> loaded via a namespace (and not attached):
 #>  [1] jsonlite_1.7.3    carData_3.0-4     here_0.1          assertthat_0.2.1 
