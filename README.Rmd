@@ -41,7 +41,7 @@ To fully reproduce the results run the `simulation.R` script. To reproduce the f
 
 ## Inspect results using the Docker
 
-Running the docker provides an RStudio API in your browser with all packages pre-installed and data to inspect the results. Therefore do:
+Running the [docker](https://hub.docker.com/r/schalkdaniel/simulations-distr-auc) provides an RStudio API in your browser with all packages pre-installed and data to inspect the results. Therefore do:
 
 1. Get the docker:
   - __Build the docker manually:__ Run `sudo docker build -t schalkdaniel/simulations-distr-auc .` (You can use whatever tag you like, but for consistency we use `schalkdaniel/simulations-distr-auc`)
