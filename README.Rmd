@@ -89,7 +89,8 @@ sysfonts::font_add_google(font, font)
 extrafont::loadfonts()
 ft = extrafont::fonttable()
 
-if (all(! grepl(font, x = ft$FamilyName))) {
+#if (all(! grepl(font, x = ft$FamilyName))) {
+if (TRUE) {
   my_theme = theme_minimal()
 } else {
   my_theme = theme_minimal(base_family = font)
@@ -139,20 +140,30 @@ results = reduceResultsList()
 # - 1. element of list contains the ordinary ROC-GLM.
 # - All other elements contain the distributed ROC-GLM with differential privacy.
 aucs_emp = do.call(rbind, lapply(results[[1]], function(ll) ll$aucs))
-aucs_dp  = do.call(rbind, lapply(results[-1], function(ll) {
+aucs_dp0 = do.call(rbind, lapply(results[-1], function(ll) {
   do.call(rbind, lapply(ll, function(l) l$aucs))
 }))
 
+# Manual inspection:
+aucs_dp0 %>%
+  filter(l2sens == 0.07, epsilon == 0.5, delta == 0.5)
+
+
 ### Distributed ROC-GLM approximations:
+#lbreaks = c((0.8 - 0.6) * 0.01, 1 * 0.01)
+lbreaks = c(0.01, 0.05)
 app_acc = rbind(
-  data.frame(lower = 0, upper = (0.8 - 0.6) * 1 / 100, qual = "$\\Delta AUC < 0.002$"),
-  data.frame(lower = (0.8 - 0.6) * 1 / 100, upper = (1 - 0.5) * 1 / 100, qual = "$\\Delta AUC < 0.005$"),
-  data.frame(lower = (1 - 0.5) * 1 / 100, upper = Inf, qual = "unacceptable")
+  data.frame(lower = -Inf,       upper = lbreaks[1], qual = paste0("$\\Delta AUC < ", lbreaks[1], "$")),
+  #data.frame(lower = lbreaks[1], upper = lbreaks[2], qual = paste0("$\\Delta AUC < ", lbreaks[2], "$")),
+  data.frame(lower = lbreaks[2], upper = Inf,        qual = "unacceptable")
 )
-aucs_dp = aucs_dp %>%
+
+aucs_dp = aucs_dp0 %>%
   mutate(
     auc_diff = abs(auc_emp - auc_roc),
+    st_auc_diff = abs(auc_emp - auc_roc) / auc_emp,
     qual = cut(auc_diff, breaks = c(app_acc$lower, Inf), labels = app_acc$qual))
+
 ```
 
 ### Figures
@@ -217,7 +228,6 @@ for (i in seq_along(l2senss)) {
 
   tab = df_dp %>%
     mutate(
-      auc_app_cut = cut(x = auc_roc, breaks = auc_cuts),
       auc_emp_cut = cut(x = auc_emp, breaks = auc_cuts)
     ) %>%
     group_by(auc_emp_cut, epsilon, delta) %>%
@@ -229,8 +239,12 @@ for (i in seq_along(l2senss)) {
       "3rd Qu." = quantile(auc_diff, 0.75, na.rm = TRUE),
       Max.      = max(auc_diff, na.rm = TRUE),
       Sd.       = sd(auc_diff, na.rm = TRUE),
-      Count     = n()) %>%
-    mutate(qual = cut(abs(Mean), breaks = c(app_acc$lower, Inf), labels = app_acc$qual))
+      Count     = n(),
+      MAE       = mean(auc_diff, na.rm = TRUE),
+      RMSE      = sqrt(mean(auc_diff^2)),
+      stMAE     = mean(st_auc_diff, na.rm = TRUE)) %>%
+    mutate(qual = cut(abs(stMAE), breaks = c(app_acc$lower, Inf), labels = app_acc$qual))
+
 
   tab$qual = factor(tab$qual, levels = rev(app_acc$qual))
 
@@ -240,24 +254,42 @@ for (i in seq_along(l2senss)) {
       labels = auc_cuts[c(5, 11, 17)]) +
     xlab("") +
     theme(axis.text.x = element_blank()) +
-    ylab("") +
-    ylab("AUC bin") +
     scale_color_npg(labels = unname(latex2exp::TeX(rev(app_acc$qual)))) +
     scale_fill_npg(labels = unname(latex2exp::TeX(rev(app_acc$qual)))) +
     labs(color = "Accuracy", fill = "Accuracy") +
     facet_grid(delta ~ epsilon, labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
-    theme(
-      axis.ticks.y = element_line(colour = "black", size = 0.2),
-      strip.text = element_text(color = "black", face = "bold", size = 5),
-      panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
-      legend.position = "bottom",
-      panel.spacing = unit(0, "lines")
-    ) +
     ggtitle(latex2exp::TeX(paste0("$\\Delta_2(f) = ", l2senss[i], "$")))
+
+  if (i == 1) {
+    ggs_auc[[i]] = ggs_auc[[i]] +
+      ylab("AUC bin") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        strip.text.x = element_text(angle = 270)
+      )
+  } else {
+    ggs_auc[[i]] = ggs_auc[[i]] +
+      ylab("") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        axis.text.y = element_blank(),
+        strip.text.x = element_text(angle = 270),
+        axis.title.y = element_blank()
+      )
+  }
 }
 
-gg_auc_dp = ggpubr::ggarrange(ggs_auc[[1]], ggs_auc[[2]], ggs_auc[[3]], ncol = 3, nrow = 1,
-  common.legend = TRUE, legend = "bottom")
+gg_auc_dp = do.call(ggpubr::ggarrange, c(ggs_auc, list(nrow = 1,
+  common.legend = TRUE, legend = "bottom",
+  widths = c(1, rep(0.8, length(ggs_auc) - 1)))))
 
 gg_auc_dp
 
@@ -433,15 +465,20 @@ for (l2s0 in l2s) {
       mapping = aes(x = xx, y = yx, group = group, color = as.factor(id)), alpha = 0.6, show.legend = FALSE) +
     geom_segment(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, xend = xnew, yend = -2 * y)) +
     geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, label = order_original, fill = as.factor(id)),
-      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+      size = 1.5, show.legend = FALSE, color = "white", #family = font,
+      fontface = "bold") +
     geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = xnew, y = -2 * y, label = order_new, fill = as.factor(id)),
-      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+      size = 1.5, show.legend = FALSE, color = "white", #family = font,
+      fontface = "bold") +
     geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = 0, label = "f(x)"),
-      family = font, size = 2, hjust = 0, fill = "white", label.size = 0) +
+      #family = font,
+               size = 2, hjust = 0, fill = "white", label.size = 0) +
     geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = -2 * y, label = "f(x) + r"),
-      family = font, size = 2, hjust = -0, fill = "white", label.size = 0) +
+      #family = font,
+               size = 2, hjust = -0, fill = "white", label.size = 0) +
     geom_label(data = df_tau %>% filter(l2s == l2s0), aes(x = xleft, y = y * 9, label = sd_label),
-      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0, family = font) +
+      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0#, family = font
+      ) +
     facet_grid(delta ~ epsilon, scales = "free", labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
     scale_color_npg() +
     scale_fill_npg() +

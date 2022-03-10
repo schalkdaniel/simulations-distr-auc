@@ -52,8 +52,10 @@ figures are created and stored in `figures` while the table is stored in
 
 ## Inspect results using the Docker
 
-Running the [docker](https://hub.docker.com/r/schalkdaniel/simulations-distr-auc) provides an RStudio API in your browser with all
-packages pre-installed and data to inspect the results. Therefore do:
+Running the
+[docker](https://hub.docker.com/r/schalkdaniel/simulations-distr-auc)
+provides an RStudio API in your browser with all packages pre-installed
+and data to inspect the results. Therefore do:
 
 1.  Get the docker:
 
@@ -102,7 +104,8 @@ sysfonts::font_add_google(font, font)
 extrafont::loadfonts()
 ft = extrafont::fonttable()
 
-if (all(! grepl(font, x = ft$FamilyName))) {
+#if (all(! grepl(font, x = ft$FamilyName))) {
+if (TRUE) {
   my_theme = theme_minimal()
 } else {
   my_theme = theme_minimal(base_family = font)
@@ -146,7 +149,7 @@ loadRegistry(here::here("batchtools/"))
 #> Experiment Registry
 #>   Backend   : Interactive
 #>   File dir  : /home/daniel/repos/simulations-distr-auc/batchtools
-#>   Work dir  : ./
+#>   Work dir  : /home/daniel/repos/simulations-distr-auc
 #>   Jobs      : 76
 #>   Problems  : 1
 #>   Algorithms: 1
@@ -166,9 +169,9 @@ aucs_dp  = do.call(rbind, lapply(results[-1], function(ll) {
 
 ### Distributed ROC-GLM approximations:
 app_acc = rbind(
-  data.frame(lower = 0, upper = (0.8 - 0.6) * 1 / 100, qual = "$\\Delta AUC < 0.002$"),
-  data.frame(lower = (0.8 - 0.6) * 1 / 100, upper = (1 - 0.5) * 1 / 100, qual = "$\\Delta AUC < 0.005$"),
-  data.frame(lower = (1 - 0.5) * 1 / 100, upper = Inf, qual = "unacceptable")
+  data.frame(lower = -Inf, upper = 0.01, qual = "$\\Delta AUC < 0.01$"),
+  data.frame(lower = 0.01, upper = 0.05, qual = "$\\Delta AUC < 0.05$"),
+  data.frame(lower = 0.05, upper = Inf, qual = "unacceptable")
 )
 aucs_dp = aucs_dp %>%
   mutate(
@@ -411,10 +414,10 @@ tab0 %>% kable()
 
 | auc\_emp\_cut |     Min. |  1st Qu. |   Median |     Mean |  3rd Qu. |   Max. |    Sd. | Count |
 | :------------ | -------: | -------: | -------: | -------: | -------: | -----: | -----: | ----: |
-| (0.5,0.525\]  | \-0.0044 | \-0.0002 |   0.0002 |   0.0003 |   0.0008 | 0.0053 | 0.0009 |   384 |
-| (0.525,0.55\] | \-0.0052 |   0.0000 |   0.0006 |   0.0006 |   0.0011 | 0.0042 | 0.0010 |   490 |
-| (0.55,0.575\] | \-0.0031 |   0.0003 |   0.0009 |   0.0009 |   0.0015 | 0.0052 | 0.0010 |   463 |
-| (0.575,0.6\]  | \-0.0018 |   0.0006 |   0.0012 |   0.0012 |   0.0017 | 0.0052 | 0.0010 |   481 |
+| (0.5,0.525\]  | \-0.0044 | \-0.0001 |   0.0005 |   0.0040 |   0.0014 | 0.0506 | 0.0100 |   431 |
+| (0.525,0.55\] | \-0.0052 |   0.0001 |   0.0006 |   0.0027 |   0.0011 | 0.0986 | 0.0123 |   505 |
+| (0.55,0.575\] | \-0.0031 |   0.0003 |   0.0009 |   0.0014 |   0.0015 | 0.1298 | 0.0080 |   465 |
+| (0.575,0.6\]  | \-0.0018 |   0.0006 |   0.0012 |   0.0015 |   0.0017 | 0.1567 | 0.0072 |   482 |
 | (0.6,0.625\]  | \-0.0044 |   0.0009 |   0.0015 |   0.0014 |   0.0020 | 0.0064 | 0.0010 |   485 |
 | (0.625,0.65\] | \-0.0039 |   0.0012 |   0.0017 |   0.0017 |   0.0022 | 0.0069 | 0.0010 |   501 |
 | (0.65,0.675\] | \-0.0031 |   0.0013 |   0.0018 |   0.0018 |   0.0023 | 0.0068 | 0.0011 |   503 |
@@ -493,15 +496,20 @@ for (l2s0 in l2s) {
       mapping = aes(x = xx, y = yx, group = group, color = as.factor(id)), alpha = 0.6, show.legend = FALSE) +
     geom_segment(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, xend = xnew, yend = -2 * y)) +
     geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, label = order_original, fill = as.factor(id)),
-      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+      size = 1.5, show.legend = FALSE, color = "white", #family = font,
+      fontface = "bold") +
     geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = xnew, y = -2 * y, label = order_new, fill = as.factor(id)),
-      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+      size = 1.5, show.legend = FALSE, color = "white", #family = font,
+      fontface = "bold") +
     geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = 0, label = "f(x)"),
-      family = font, size = 2, hjust = 0, fill = "white", label.size = 0) +
+      #family = font,
+               size = 2, hjust = 0, fill = "white", label.size = 0) +
     geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = -2 * y, label = "f(x) + r"),
-      family = font, size = 2, hjust = -0, fill = "white", label.size = 0) +
+      #family = font,
+               size = 2, hjust = -0, fill = "white", label.size = 0) +
     geom_label(data = df_tau %>% filter(l2s == l2s0), aes(x = xleft, y = y * 9, label = sd_label),
-      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0, family = font) +
+      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0#, family = font
+      ) +
     facet_grid(delta ~ epsilon, scales = "free", labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
     scale_color_npg() +
     scale_fill_npg() +
@@ -531,21 +539,21 @@ ggs_gm[[1]]
 
 ``` r
 sessionInfo()
-#> R version 4.1.2 (2021-11-01)
+#> R version 3.6.3 (2020-02-29)
 #> Platform: x86_64-pc-linux-gnu (64-bit)
-#> Running under: Arch Linux
+#> Running under: Ubuntu 20.04.4 LTS
 #> 
 #> Matrix products: default
-#> BLAS:   /usr/lib/libblas.so.3.10.0
-#> LAPACK: /usr/lib/liblapack.so.3.10.0
+#> BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.9.0
+#> LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.9.0
 #> 
 #> locale:
 #>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
-#>  [3] LC_TIME=en_GB.UTF-8        LC_COLLATE=en_US.UTF-8    
-#>  [5] LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_US.UTF-8   
-#>  [7] LC_PAPER=en_GB.UTF-8       LC_NAME=C                 
+#>  [3] LC_TIME=de_DE.UTF-8        LC_COLLATE=en_US.UTF-8    
+#>  [5] LC_MONETARY=de_DE.UTF-8    LC_MESSAGES=en_US.UTF-8   
+#>  [7] LC_PAPER=de_DE.UTF-8       LC_NAME=C                 
 #>  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
-#> [11] LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
+#> [11] LC_MEASUREMENT=de_DE.UTF-8 LC_IDENTIFICATION=C       
 #> 
 #> attached base packages:
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
@@ -556,24 +564,21 @@ sessionInfo()
 #>  [9] tidyr_1.1.4       dplyr_1.0.7      
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] jsonlite_1.7.3    carData_3.0-4     here_0.1          assertthat_0.2.1 
-#>  [5] highr_0.8         prettycode_1.1.0  base64url_1.4     cellranger_1.1.0 
-#>  [9] yaml_2.2.1        progress_1.2.2    Rttf2pt1_1.3.8    pillar_1.7.0     
-#> [13] backports_1.4.1   glue_1.6.1        extrafontdb_1.0   digest_0.6.29    
-#> [17] ggsignif_0.6.0    colorspace_2.0-2  cowplot_1.0.0     htmltools_0.4.0  
-#> [21] plyr_1.8.6        pkgconfig_2.0.3   broom_0.7.1       haven_2.4.3      
-#> [25] sysfonts_0.8.1    purrr_0.3.4       scales_1.1.1      brew_1.0-6       
-#> [29] openxlsx_4.2.2    rio_0.5.16        tibble_3.1.6      generics_0.1.2   
-#> [33] farver_2.1.0      car_3.0-10        ellipsis_0.3.2    ggpubr_0.3.0     
-#> [37] withr_2.4.3       cli_3.2.0         readxl_1.3.1      magrittr_2.0.2   
-#> [41] crayon_1.5.0      evaluate_0.14     fs_1.5.0          fansi_1.0.2      
-#> [45] forcats_0.5.1     rstatix_0.5.0     foreign_0.8-81    textshaping_0.3.6
-#> [49] tools_4.1.2       data.table_1.14.2 prettyunits_1.1.1 hms_1.1.1        
-#> [53] lifecycle_1.0.1   stringr_1.4.0     munsell_0.5.0     zip_2.1.1        
-#> [57] compiler_4.1.2    systemfonts_1.0.3 rlang_1.0.1       grid_4.1.2       
-#> [61] rappdirs_0.3.3    labeling_0.4.2    rmarkdown_2.11    gtable_0.3.0     
-#> [65] abind_1.4-5       DBI_1.1.0         curl_4.3.2        R6_2.5.1         
-#> [69] extrafont_0.17    utf8_1.2.2        rprojroot_2.0.2   latex2exp_0.5.0  
-#> [73] ragg_1.2.0        stringi_1.7.6     Rcpp_1.0.8        vctrs_0.3.8      
-#> [77] tidyselect_1.1.1  xfun_0.27
+#>  [1] Rcpp_1.0.7        here_0.1          prettyunits_1.1.1 sysfonts_0.8.1   
+#>  [5] rprojroot_2.0.2   digest_0.6.28     utf8_1.2.1        prettycode_1.1.0 
+#>  [9] R6_2.5.1          plyr_1.8.6        backports_1.3.0   evaluate_0.14    
+#> [13] highr_0.8         pillar_1.5.1      rlang_0.4.10      progress_1.2.2   
+#> [17] curl_4.3          data.table_1.14.2 car_3.0-12        extrafontdb_1.0  
+#> [21] rmarkdown_2.11    labeling_0.4.2    extrafont_0.17    stringr_1.4.0    
+#> [25] munsell_0.5.0     broom_0.7.12      compiler_3.6.3    xfun_0.30        
+#> [29] pkgconfig_2.0.3   htmltools_0.5.2   tidyselect_1.1.0  tibble_3.1.0     
+#> [33] fansi_0.4.2       ggpubr_0.3.0      crayon_1.4.1      withr_2.4.1      
+#> [37] rappdirs_0.3.3    grid_3.6.3        jsonlite_1.7.3    Rttf2pt1_1.3.10  
+#> [41] gtable_0.3.0      lifecycle_1.0.0   magrittr_2.0.1    scales_1.1.1     
+#> [45] carData_3.0-5     stringi_1.5.3     ggsignif_0.6.3    farver_2.1.0     
+#> [49] fs_1.5.0          ellipsis_0.3.2    brew_1.0-6        generics_0.1.0   
+#> [53] vctrs_0.3.8       cowplot_1.1.1     latex2exp_0.5.0   tools_3.6.3      
+#> [57] glue_1.5.0        purrr_0.3.4       hms_1.1.1         abind_1.4-5      
+#> [61] fastmap_1.1.0     yaml_2.2.1        colorspace_2.0-0  rstatix_0.7.0    
+#> [65] base64url_1.4
 ```

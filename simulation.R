@@ -52,7 +52,7 @@ if (dir.exists(BATCHTOOLS_DIR) && (! RERUN)) {
     source   = FILES,
     seed     = 31415)
 
-  reg$cluster.functions = makeClusterFunctionsMulticore(ncpus = parallel::detectCores() - 1)
+  reg$cluster.functions = makeClusterFunctionsMulticore(ncpus = parallel::detectCores())
 
   saveRegistry(reg)
 
