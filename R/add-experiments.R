@@ -50,7 +50,7 @@ fAlgo = function(job, data, instance, base_seed, l2sens, epsilon, delta, reps) {
       ci_app_auc = 1 / (1 + exp(-ci_app_log))
 
       # Calculate the error of the approximated CI:
-      delta_ci = sum(abs(ci_app_auc - ci_emp_auc)) / sum(diff(ci_emp_auc))
+      delta_ci = sum(abs(ci_app_auc - ci_emp_auc))# / sum(diff(ci_emp_auc))
 
       # Gather results:
       df_aucs = data.frame(auc_emp = auc_emp, auc_roc = auc_roc, auc_roc_param1 = auc_roc_params[1],

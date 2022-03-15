@@ -28,7 +28,7 @@ study for the respective paper. It also contains the code used to create the fig
 - File to run the simulations: `simulation.R`
 - `R` code:
     - Helper function for calculating the Probit regression, AUC values, and confidence intervals: `R/helper.R`
-    - Code to add the experiments using `batchtools` (called by `simulation.R`): `R/add-experiments.R`
+    - Code to define and add the experiments using `batchtools` (called by `simulation.R`): `R/add-experiments.R`
     - Installation script to get all required package with the version used for the benchmark: `R/install-pkgs-versions.R`
     - Setup variables like repetitions or the grid of values for the simulation for the benchmark: `R/setup.R`
 - Batchtools registry and results: `batchtools` (see [below](#simulation-results) how to load the results)
@@ -144,9 +144,9 @@ aucs_dp0 = do.call(rbind, lapply(results[-1], function(ll) {
   do.call(rbind, lapply(ll, function(l) l$aucs))
 }))
 
-# Manual inspection:
-aucs_dp0 %>%
-  filter(l2sens == 0.07, epsilon == 0.5, delta == 0.5)
+## Manual inspection:
+#aucs_dp0 %>%
+#  filter(l2sens == 0.07, epsilon == 0.5, delta == 0.5)
 
 
 ### Distributed ROC-GLM approximations:
@@ -243,12 +243,13 @@ for (i in seq_along(l2senss)) {
       MAE       = mean(auc_diff, na.rm = TRUE),
       RMSE      = sqrt(mean(auc_diff^2)),
       stMAE     = mean(st_auc_diff, na.rm = TRUE)) %>%
-    mutate(qual = cut(abs(stMAE), breaks = c(app_acc$lower, Inf), labels = app_acc$qual))
-
+    mutate(qual = cut(abs(MAE), breaks = c(app_acc$lower, Inf), labels = app_acc$qual)) %>%
+    select(qual, auc_emp_cut, delta, epsilon) %>%
+    na.omit()
 
   tab$qual = factor(tab$qual, levels = rev(app_acc$qual))
 
-  ggs_auc[[i]] = ggplot(na.omit(tab), aes(x = "1", y = auc_emp_cut, color = qual, fill = qual)) +
+  ggs_auc[[i]] = ggplot(tab, aes(x = "1", y = auc_emp_cut, color = qual, fill = qual)) +
     geom_tile() +
     scale_y_discrete(limits = rev, breaks = levels(tab$auc_emp_cut)[c(5, 11, 17)],
       labels = auc_cuts[c(5, 11, 17)]) +
@@ -289,7 +290,7 @@ for (i in seq_along(l2senss)) {
 
 gg_auc_dp = do.call(ggpubr::ggarrange, c(ggs_auc, list(nrow = 1,
   common.legend = TRUE, legend = "bottom",
-  widths = c(1, rep(0.8, length(ggs_auc) - 1)))))
+  widths = c(1, rep(0.75, length(ggs_auc) - 1)))))
 
 gg_auc_dp
 
@@ -338,24 +339,43 @@ for (i in seq_along(l2senss)) {
       labels = auc_cuts[c(5, 11, 17)]) +
     xlab("") +
     theme(axis.text.x = element_blank()) +
-    ylab("AUC bin") +
     scale_color_npg(labels = unname(latex2exp::TeX(levels(tab$qual_ci)))) +
     scale_fill_npg(labels = unname(latex2exp::TeX(levels(tab$qual_ci)))) +
     labs(fill = "Accuracy") +
     guides(color = "none") +
     facet_grid(delta ~ epsilon, labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
-    theme(
-      axis.ticks.y = element_line(colour = "black", size = 0.2),
-      strip.text = element_text(color = "black", face = "bold", size = 5),
-      panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
-      legend.position = "bottom",
-      panel.spacing = unit(0, "lines")
-    ) +
     ggtitle(latex2exp::TeX(paste0("$\\Delta_2(f) = ", l2senss[i], "$")))
+
+  if (i == 1) {
+    ggs_ci[[i]] = ggs_ci[[i]] +
+      ylab("AUC bin") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        strip.text.x = element_text(angle = 270)
+      )
+  } else {
+    ggs_ci[[i]] = ggs_ci[[i]] +
+      ylab("") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        axis.text.y = element_blank(),
+        strip.text.x = element_text(angle = 270),
+        axis.title.y = element_blank()
+      )
+  }
 }
 
-gg_ci_dp = ggpubr::ggarrange(ggs_ci[[1]], ggs_ci[[2]], ggs_ci[[3]], ncol = 3, nrow = 1,
-  common.legend = TRUE, legend = "bottom")
+gg_ci_dp = do.call(ggpubr::ggarrange, c(ggs_ci, list(nrow = 1,
+  common.legend = TRUE, legend = "bottom",
+  widths = c(1, rep(0.75, length(ggs_ci) - 1)))))
 
 gg_ci_dp
 
@@ -394,7 +414,7 @@ tab$auc_emp_cut = paste0("$", tab$auc_emp_cut, "$")
 tab$Count = paste0("$", tab$Count, "$")
 tnames = names(tab)
 for (tn in tnames[-c(1, length(tnames))]) {
-  tab[[tn]] = ifelse((abs(tab[[tn]]) > 0.005) & (tn %in% c("Median", "Mean")),
+  tab[[tn]] = ifelse((abs(tab[[tn]]) > 0.01) & (tn %in% c("Median", "Mean")),
     paste0("$\\mathbf{", sprintf("%.4f", round(tab[[tn]], 4)), "}$"),
     paste0("$", sprintf("%.4f", round(tab[[tn]], 4)), "$"))
 }
