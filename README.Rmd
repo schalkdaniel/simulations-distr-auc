@@ -168,7 +168,7 @@ aucs_dp = aucs_dp0 %>%
 
 ### Figures
 
-#### AUC densities
+#### AUC densities, Figure 3, Section 5.3.1
 
 ```{r}
 ## Comparison for different n intervals:
@@ -215,6 +215,8 @@ ggsave(plot = gg_den_both_facet,
 ```
 
 ### Approximation errors
+
+#### Figure 4, Section 5.3.1
 
 ```{r}
 ## AUC VALUES
@@ -303,6 +305,9 @@ ggsave(plot = gg_auc_dp,
 #evince(here::here("figures/auc-diff-priv.pdf"))
 ```
 
+#### Figure 5, Section 5.3.2
+
+
 ```{r}
 ## CI BOUNDARIES
 ## =======================================================
@@ -389,6 +394,8 @@ ggsave(plot = gg_ci_dp,
 ```
 
 ### Table of AUC values
+
+#### Table 1, Section 5.3.1
 
 ```{r}
 # Discretize empirical AUC values into 20 bins between 0.5 and 1.
@@ -514,9 +521,18 @@ for (l2s0 in l2s) {
     height = textwidth,
     units = "mm")
 }
-ggs_gm[[1]]
+```
 
-# evince(here::here("figures/gaussian-mechanism0.01.pdf"))
+#### Appendix A.2, Figure 9
+
+```{r}
+ggs_gm[[1]]
+```
+
+#### Appendix A.2, Figure 10
+
+```{r}
+ggs_gm[[2]]
 ```
 
 ## Session Info
