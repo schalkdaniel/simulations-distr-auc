@@ -30,8 +30,8 @@ used to create the figures and tables.
   - `R` code:
       - Helper function for calculating the Probit regression, AUC
         values, and confidence intervals: `R/helper.R`
-      - Code to add the experiments using `batchtools` (called by
-        `simulation.R`): `R/add-experiments.R`
+      - Code to define and add the experiments using `batchtools`
+        (called by `simulation.R`): `R/add-experiments.R`
       - Installation script to get all required package with the version
         used for the benchmark: `R/install-pkgs-versions.R`
       - Setup variables like repetitions or the grid of values for the
@@ -52,8 +52,10 @@ figures are created and stored in `figures` while the table is stored in
 
 ## Inspect results using the Docker
 
-Running the [docker](https://hub.docker.com/r/schalkdaniel/simulations-distr-auc) provides an RStudio API in your browser with all
-packages pre-installed and data to inspect the results. Therefore do:
+Running the
+[docker](https://hub.docker.com/r/schalkdaniel/simulations-distr-auc)
+provides an RStudio API in your browser with all packages pre-installed
+and data to inspect the results. Therefore do:
 
 1.  Get the docker:
 
@@ -102,7 +104,8 @@ sysfonts::font_add_google(font, font)
 extrafont::loadfonts()
 ft = extrafont::fonttable()
 
-if (all(! grepl(font, x = ft$FamilyName))) {
+#if (all(! grepl(font, x = ft$FamilyName))) {
+if (TRUE) {
   my_theme = theme_minimal()
 } else {
   my_theme = theme_minimal(base_family = font)
@@ -146,8 +149,8 @@ loadRegistry(here::here("batchtools/"))
 #> Experiment Registry
 #>   Backend   : Interactive
 #>   File dir  : /home/daniel/repos/simulations-distr-auc/batchtools
-#>   Work dir  : ./
-#>   Jobs      : 76
+#>   Work dir  : /home/daniel/repos/simulations-distr-auc
+#>   Jobs      : 126
 #>   Problems  : 1
 #>   Algorithms: 1
 #>   Seed      : 31415
@@ -160,25 +163,34 @@ results = reduceResultsList()
 # - 1. element of list contains the ordinary ROC-GLM.
 # - All other elements contain the distributed ROC-GLM with differential privacy.
 aucs_emp = do.call(rbind, lapply(results[[1]], function(ll) ll$aucs))
-aucs_dp  = do.call(rbind, lapply(results[-1], function(ll) {
+aucs_dp0 = do.call(rbind, lapply(results[-1], function(ll) {
   do.call(rbind, lapply(ll, function(l) l$aucs))
 }))
 
+## Manual inspection:
+#aucs_dp0 %>%
+#  filter(l2sens == 0.07, epsilon == 0.5, delta == 0.5)
+
+
 ### Distributed ROC-GLM approximations:
+#lbreaks = c((0.8 - 0.6) * 0.01, 1 * 0.01)
+lbreaks = c(0.01, 0.05)
 app_acc = rbind(
-  data.frame(lower = 0, upper = (0.8 - 0.6) * 1 / 100, qual = "$\\Delta AUC < 0.002$"),
-  data.frame(lower = (0.8 - 0.6) * 1 / 100, upper = (1 - 0.5) * 1 / 100, qual = "$\\Delta AUC < 0.005$"),
-  data.frame(lower = (1 - 0.5) * 1 / 100, upper = Inf, qual = "unacceptable")
+  data.frame(lower = -Inf,       upper = lbreaks[1], qual = paste0("$\\Delta AUC < ", lbreaks[1], "$")),
+  #data.frame(lower = lbreaks[1], upper = lbreaks[2], qual = paste0("$\\Delta AUC < ", lbreaks[2], "$")),
+  data.frame(lower = lbreaks[2], upper = Inf,        qual = "unacceptable")
 )
-aucs_dp = aucs_dp %>%
+
+aucs_dp = aucs_dp0 %>%
   mutate(
     auc_diff = abs(auc_emp - auc_roc),
+    st_auc_diff = abs(auc_emp - auc_roc) / auc_emp,
     qual = cut(auc_diff, breaks = c(app_acc$lower, Inf), labels = app_acc$qual))
 ```
 
 ### Figures
 
-#### AUC densities
+#### AUC densities, Figure 3, Section 5.3.1
 
 ``` r
 ## Comparison for different n intervals:
@@ -231,6 +243,8 @@ ggsave(plot = gg_den_both_facet,
 
 ### Approximation errors
 
+#### Figure 4, Section 5.3.1
+
 ``` r
 ## AUC VALUES
 ## =======================================================
@@ -243,7 +257,6 @@ for (i in seq_along(l2senss)) {
 
   tab = df_dp %>%
     mutate(
-      auc_app_cut = cut(x = auc_roc, breaks = auc_cuts),
       auc_emp_cut = cut(x = auc_emp, breaks = auc_cuts)
     ) %>%
     group_by(auc_emp_cut, epsilon, delta) %>%
@@ -255,35 +268,58 @@ for (i in seq_along(l2senss)) {
       "3rd Qu." = quantile(auc_diff, 0.75, na.rm = TRUE),
       Max.      = max(auc_diff, na.rm = TRUE),
       Sd.       = sd(auc_diff, na.rm = TRUE),
-      Count     = n()) %>%
-    mutate(qual = cut(abs(Mean), breaks = c(app_acc$lower, Inf), labels = app_acc$qual))
+      Count     = n(),
+      MAE       = mean(auc_diff, na.rm = TRUE),
+      RMSE      = sqrt(mean(auc_diff^2)),
+      stMAE     = mean(st_auc_diff, na.rm = TRUE)) %>%
+    mutate(qual = cut(abs(MAE), breaks = c(app_acc$lower, Inf), labels = app_acc$qual)) %>%
+    select(qual, auc_emp_cut, delta, epsilon) %>%
+    na.omit()
 
   tab$qual = factor(tab$qual, levels = rev(app_acc$qual))
 
-  ggs_auc[[i]] = ggplot(na.omit(tab), aes(x = "1", y = auc_emp_cut, color = qual, fill = qual)) +
+  ggs_auc[[i]] = ggplot(tab, aes(x = "1", y = auc_emp_cut, color = qual, fill = qual)) +
     geom_tile() +
     scale_y_discrete(limits = rev, breaks = levels(tab$auc_emp_cut)[c(5, 11, 17)],
       labels = auc_cuts[c(5, 11, 17)]) +
     xlab("") +
     theme(axis.text.x = element_blank()) +
-    ylab("") +
-    ylab("AUC bin") +
     scale_color_npg(labels = unname(latex2exp::TeX(rev(app_acc$qual)))) +
     scale_fill_npg(labels = unname(latex2exp::TeX(rev(app_acc$qual)))) +
     labs(color = "Accuracy", fill = "Accuracy") +
     facet_grid(delta ~ epsilon, labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
-    theme(
-      axis.ticks.y = element_line(colour = "black", size = 0.2),
-      strip.text = element_text(color = "black", face = "bold", size = 5),
-      panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
-      legend.position = "bottom",
-      panel.spacing = unit(0, "lines")
-    ) +
     ggtitle(latex2exp::TeX(paste0("$\\Delta_2(f) = ", l2senss[i], "$")))
+
+  if (i == 1) {
+    ggs_auc[[i]] = ggs_auc[[i]] +
+      ylab("AUC bin") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        strip.text.x = element_text(angle = 270)
+      )
+  } else {
+    ggs_auc[[i]] = ggs_auc[[i]] +
+      ylab("") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        axis.text.y = element_blank(),
+        strip.text.x = element_text(angle = 270),
+        axis.title.y = element_blank()
+      )
+  }
 }
 
-gg_auc_dp = ggpubr::ggarrange(ggs_auc[[1]], ggs_auc[[2]], ggs_auc[[3]], ncol = 3, nrow = 1,
-  common.legend = TRUE, legend = "bottom")
+gg_auc_dp = do.call(ggpubr::ggarrange, c(ggs_auc, list(nrow = 1,
+  common.legend = TRUE, legend = "bottom",
+  widths = c(1, rep(0.75, length(ggs_auc) - 1)))))
 
 gg_auc_dp
 ```
@@ -300,6 +336,8 @@ ggsave(plot = gg_auc_dp,
 
 #evince(here::here("figures/auc-diff-priv.pdf"))
 ```
+
+#### Figure 5, Section 5.3.2
 
 ``` r
 ## CI BOUNDARIES
@@ -337,24 +375,43 @@ for (i in seq_along(l2senss)) {
       labels = auc_cuts[c(5, 11, 17)]) +
     xlab("") +
     theme(axis.text.x = element_blank()) +
-    ylab("AUC bin") +
     scale_color_npg(labels = unname(latex2exp::TeX(levels(tab$qual_ci)))) +
     scale_fill_npg(labels = unname(latex2exp::TeX(levels(tab$qual_ci)))) +
     labs(fill = "Accuracy") +
     guides(color = "none") +
     facet_grid(delta ~ epsilon, labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
-    theme(
-      axis.ticks.y = element_line(colour = "black", size = 0.2),
-      strip.text = element_text(color = "black", face = "bold", size = 5),
-      panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
-      legend.position = "bottom",
-      panel.spacing = unit(0, "lines")
-    ) +
     ggtitle(latex2exp::TeX(paste0("$\\Delta_2(f) = ", l2senss[i], "$")))
+
+  if (i == 1) {
+    ggs_ci[[i]] = ggs_ci[[i]] +
+      ylab("AUC bin") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        strip.text.x = element_text(angle = 270)
+      )
+  } else {
+    ggs_ci[[i]] = ggs_ci[[i]] +
+      ylab("") +
+      theme(
+        axis.ticks.y = element_line(colour = "black", size = 0.2),
+        strip.text = element_text(color = "black", face = "bold", size = 5),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+        legend.position = "bottom",
+        panel.spacing = unit(0, "lines"),
+        axis.text.y = element_blank(),
+        strip.text.x = element_text(angle = 270),
+        axis.title.y = element_blank()
+      )
+  }
 }
 
-gg_ci_dp = ggpubr::ggarrange(ggs_ci[[1]], ggs_ci[[2]], ggs_ci[[3]], ncol = 3, nrow = 1,
-  common.legend = TRUE, legend = "bottom")
+gg_ci_dp = do.call(ggpubr::ggarrange, c(ggs_ci, list(nrow = 1,
+  common.legend = TRUE, legend = "bottom",
+  widths = c(1, rep(0.75, length(ggs_ci) - 1)))))
 
 gg_ci_dp
 ```
@@ -373,6 +430,8 @@ ggsave(plot = gg_ci_dp,
 ```
 
 ### Table of AUC values
+
+#### Table 1, Section 5.3.1
 
 ``` r
 # Discretize empirical AUC values into 20 bins between 0.5 and 1.
@@ -398,7 +457,7 @@ tab$auc_emp_cut = paste0("$", tab$auc_emp_cut, "$")
 tab$Count = paste0("$", tab$Count, "$")
 tnames = names(tab)
 for (tn in tnames[-c(1, length(tnames))]) {
-  tab[[tn]] = ifelse((abs(tab[[tn]]) > 0.005) & (tn %in% c("Median", "Mean")),
+  tab[[tn]] = ifelse((abs(tab[[tn]]) > 0.01) & (tn %in% c("Median", "Mean")),
     paste0("$\\mathbf{", sprintf("%.4f", round(tab[[tn]], 4)), "}$"),
     paste0("$", sprintf("%.4f", round(tab[[tn]], 4)), "$"))
 }
@@ -411,10 +470,10 @@ tab0 %>% kable()
 
 | auc\_emp\_cut |     Min. |  1st Qu. |   Median |     Mean |  3rd Qu. |   Max. |    Sd. | Count |
 | :------------ | -------: | -------: | -------: | -------: | -------: | -----: | -----: | ----: |
-| (0.5,0.525\]  | \-0.0044 | \-0.0002 |   0.0002 |   0.0003 |   0.0008 | 0.0053 | 0.0009 |   384 |
-| (0.525,0.55\] | \-0.0052 |   0.0000 |   0.0006 |   0.0006 |   0.0011 | 0.0042 | 0.0010 |   490 |
-| (0.55,0.575\] | \-0.0031 |   0.0003 |   0.0009 |   0.0009 |   0.0015 | 0.0052 | 0.0010 |   463 |
-| (0.575,0.6\]  | \-0.0018 |   0.0006 |   0.0012 |   0.0012 |   0.0017 | 0.0052 | 0.0010 |   481 |
+| (0.5,0.525\]  | \-0.0044 | \-0.0001 |   0.0005 |   0.0040 |   0.0014 | 0.0506 | 0.0100 |   431 |
+| (0.525,0.55\] | \-0.0052 |   0.0001 |   0.0006 |   0.0027 |   0.0011 | 0.0986 | 0.0123 |   505 |
+| (0.55,0.575\] | \-0.0031 |   0.0003 |   0.0009 |   0.0014 |   0.0015 | 0.1298 | 0.0080 |   465 |
+| (0.575,0.6\]  | \-0.0018 |   0.0006 |   0.0012 |   0.0015 |   0.0017 | 0.1567 | 0.0072 |   482 |
 | (0.6,0.625\]  | \-0.0044 |   0.0009 |   0.0015 |   0.0014 |   0.0020 | 0.0064 | 0.0010 |   485 |
 | (0.625,0.65\] | \-0.0039 |   0.0012 |   0.0017 |   0.0017 |   0.0022 | 0.0069 | 0.0010 |   501 |
 | (0.65,0.675\] | \-0.0031 |   0.0013 |   0.0018 |   0.0018 |   0.0023 | 0.0068 | 0.0011 |   503 |
@@ -493,15 +552,20 @@ for (l2s0 in l2s) {
       mapping = aes(x = xx, y = yx, group = group, color = as.factor(id)), alpha = 0.6, show.legend = FALSE) +
     geom_segment(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, xend = xnew, yend = -2 * y)) +
     geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = x, y = 0, label = order_original, fill = as.factor(id)),
-      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+      size = 1.5, show.legend = FALSE, color = "white", #family = font,
+      fontface = "bold") +
     geom_label(data = df_text %>% filter(l2s == l2s0), aes(x = xnew, y = -2 * y, label = order_new, fill = as.factor(id)),
-      size = 1.5, show.legend = FALSE, color = "white", family = font, fontface = "bold") +
+      size = 1.5, show.legend = FALSE, color = "white", #family = font,
+      fontface = "bold") +
     geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = 0, label = "f(x)"),
-      family = font, size = 2, hjust = 0, fill = "white", label.size = 0) +
+      #family = font,
+               size = 2, hjust = 0, fill = "white", label.size = 0) +
     geom_label(data = df_tau %>% filter(l2s == l2s0, epsilon == 0.1), aes(x = xleft, y = -2 * y, label = "f(x) + r"),
-      family = font, size = 2, hjust = -0, fill = "white", label.size = 0) +
+      #family = font,
+               size = 2, hjust = -0, fill = "white", label.size = 0) +
     geom_label(data = df_tau %>% filter(l2s == l2s0), aes(x = xleft, y = y * 9, label = sd_label),
-      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0, family = font) +
+      parse = TRUE, fill = "white", hjust = -0, size = 3, label.size = 0#, family = font
+      ) +
     facet_grid(delta ~ epsilon, scales = "free", labeller = label_bquote(delta == .(delta), epsilon == .(epsilon))) +
     scale_color_npg() +
     scale_fill_npg() +
@@ -517,15 +581,23 @@ for (l2s0 in l2s) {
     height = textwidth,
     units = "mm")
 }
+```
+
+#### Appendix A.2, Figure 9
+
+``` r
 ggs_gm[[1]]
 ```
 
-![](figures/unnamed-chunk-8-1.png)<!-- -->
+![](figures/unnamed-chunk-9-1.png)<!-- -->
+
+#### Appendix A.2, Figure 10
 
 ``` r
-
-# evince(here::here("figures/gaussian-mechanism0.01.pdf"))
+ggs_gm[[2]]
 ```
+
+![](figures/unnamed-chunk-10-1.png)<!-- -->
 
 ## Session Info
 
@@ -540,40 +612,28 @@ sessionInfo()
 #> LAPACK: /usr/lib/liblapack.so.3.10.0
 #> 
 #> locale:
-#>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
-#>  [3] LC_TIME=en_GB.UTF-8        LC_COLLATE=en_US.UTF-8    
-#>  [5] LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_US.UTF-8   
-#>  [7] LC_PAPER=en_GB.UTF-8       LC_NAME=C                 
-#>  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+#>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C               LC_TIME=en_GB.UTF-8        LC_COLLATE=en_US.UTF-8     LC_MONETARY=en_GB.UTF-8   
+#>  [6] LC_MESSAGES=en_US.UTF-8    LC_PAPER=en_GB.UTF-8       LC_NAME=C                  LC_ADDRESS=C               LC_TELEPHONE=C            
 #> [11] LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
 #> 
 #> attached base packages:
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
 #> other attached packages:
-#>  [1] pROC_1.18.0       checkmate_2.0.0   batchtools_0.9.15 knitr_1.36       
-#>  [5] ggridges_0.5.3    ggsci_2.9         gridExtra_2.3     ggplot2_3.3.5    
-#>  [9] tidyr_1.1.4       dplyr_1.0.7      
+#>  [1] pROC_1.18.0       checkmate_2.0.0   batchtools_0.9.15 knitr_1.36        ggridges_0.5.3    ggsci_2.9         gridExtra_2.3    
+#>  [8] ggplot2_3.3.5     tidyr_1.2.0       dplyr_1.0.8      
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] jsonlite_1.7.3    carData_3.0-4     here_0.1          assertthat_0.2.1 
-#>  [5] highr_0.8         prettycode_1.1.0  base64url_1.4     cellranger_1.1.0 
-#>  [9] yaml_2.2.1        progress_1.2.2    Rttf2pt1_1.3.8    pillar_1.7.0     
-#> [13] backports_1.4.1   glue_1.6.1        extrafontdb_1.0   digest_0.6.29    
-#> [17] ggsignif_0.6.0    colorspace_2.0-2  cowplot_1.0.0     htmltools_0.4.0  
-#> [21] plyr_1.8.6        pkgconfig_2.0.3   broom_0.7.1       haven_2.4.3      
-#> [25] sysfonts_0.8.1    purrr_0.3.4       scales_1.1.1      brew_1.0-6       
-#> [29] openxlsx_4.2.2    rio_0.5.16        tibble_3.1.6      generics_0.1.2   
-#> [33] farver_2.1.0      car_3.0-10        ellipsis_0.3.2    ggpubr_0.3.0     
-#> [37] withr_2.4.3       cli_3.2.0         readxl_1.3.1      magrittr_2.0.2   
-#> [41] crayon_1.5.0      evaluate_0.14     fs_1.5.0          fansi_1.0.2      
-#> [45] forcats_0.5.1     rstatix_0.5.0     foreign_0.8-81    textshaping_0.3.6
-#> [49] tools_4.1.2       data.table_1.14.2 prettyunits_1.1.1 hms_1.1.1        
-#> [53] lifecycle_1.0.1   stringr_1.4.0     munsell_0.5.0     zip_2.1.1        
-#> [57] compiler_4.1.2    systemfonts_1.0.3 rlang_1.0.1       grid_4.1.2       
-#> [61] rappdirs_0.3.3    labeling_0.4.2    rmarkdown_2.11    gtable_0.3.0     
-#> [65] abind_1.4-5       DBI_1.1.0         curl_4.3.2        R6_2.5.1         
-#> [69] extrafont_0.17    utf8_1.2.2        rprojroot_2.0.2   latex2exp_0.5.0  
-#> [73] ragg_1.2.0        stringi_1.7.6     Rcpp_1.0.8        vctrs_0.3.8      
-#> [77] tidyselect_1.1.1  xfun_0.27
+#>  [1] jsonlite_1.8.0    carData_3.0-4     here_0.1          assertthat_0.2.1  highr_0.8         prettycode_1.1.0  base64url_1.4    
+#>  [8] cellranger_1.1.0  yaml_2.2.1        progress_1.2.2    Rttf2pt1_1.3.8    pillar_1.7.0      backports_1.4.1   glue_1.6.2       
+#> [15] extrafontdb_1.0   digest_0.6.29     ggsignif_0.6.0    colorspace_2.0-2  cowplot_1.0.0     htmltools_0.4.0   plyr_1.8.6       
+#> [22] pkgconfig_2.0.3   broom_0.7.1       haven_2.4.3       sysfonts_0.8.1    purrr_0.3.4       scales_1.1.1      brew_1.0-6       
+#> [29] openxlsx_4.2.2    rio_0.5.16        tibble_3.1.6      generics_0.1.2    farver_2.1.0      car_3.0-10        ellipsis_0.3.2   
+#> [36] ggpubr_0.3.0      withr_2.4.3       cli_3.2.0         readxl_1.3.1      magrittr_2.0.2    crayon_1.5.0      evaluate_0.14    
+#> [43] fs_1.5.0          fansi_1.0.2       forcats_0.5.1     rstatix_0.5.0     foreign_0.8-81    textshaping_0.3.6 tools_4.1.2      
+#> [50] data.table_1.14.2 prettyunits_1.1.1 hms_1.1.1         lifecycle_1.0.1   stringr_1.4.0     munsell_0.5.0     zip_2.1.1        
+#> [57] compiler_4.1.2    systemfonts_1.0.3 rlang_1.0.1       grid_4.1.2        rappdirs_0.3.3    labeling_0.4.2    rmarkdown_2.11   
+#> [64] gtable_0.3.0      abind_1.4-5       DBI_1.1.0         curl_4.3.2        R6_2.5.1          extrafont_0.17    utf8_1.2.2       
+#> [71] rprojroot_2.0.2   latex2exp_0.5.0   ragg_1.2.0        stringi_1.7.6     Rcpp_1.0.8        vctrs_0.3.8       tidyselect_1.1.2 
+#> [78] xfun_0.27
 ```
